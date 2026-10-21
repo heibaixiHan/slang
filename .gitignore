@@ -6,3 +6,4 @@ dist/
 core/build/
 examples/log_demo.jsonl
 *.decoded.lang
+.project/
