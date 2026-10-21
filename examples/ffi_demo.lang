@@ -1,0 +1,28 @@
+@sexpr
+; ffi 标准库示例：显式 (import "ffi") 后才可用。
+;
+; 两种导入模式：
+;   1. 直接导入：使用随包默认兼容配置（libm/libc 常见签名 + Python 自动发现）
+;   2. 配置文件导入：用 TOML 指定如何转译（导出、重命名、C 签名、结构体）
+
+(def ffi (import "ffi"))
+
+(println "== Python 直接导入 ==")
+(def math (ffi.python "math"))
+(println (concat "sqrt(2)  = " (str (math.sqrt 2))))
+(println (concat "pi       = " (str math.pi)))
+
+(println "== Python 配置文件导入（导出 + 重命名） ==")
+(def j (ffi.import "ffi/json.ffi.toml"))
+(println (concat "编码     = " (j.编码 (list 1 2 3))))
+(println (concat "解码     = " (str (j.解码 "[4, 5]"))))
+
+(println "== C 直接导入（默认签名表） ==")
+(def libm (ffi.c "m"))
+(println (concat "sqrt(81) = " (str (libm.sqrt 81))))
+(println (concat "pow(2,8) = " (str (libm.pow 2 8))))
+
+(println "== C 配置文件导入（结构体 + 字段） ==")
+(def libc (ffi.import "ffi/libc.ffi.toml"))
+(def r (libc.div 17 5))
+(println (concat "div(17,5)= " (str r.quot) " 余 " (str r.rem)))

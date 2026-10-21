@@ -1,0 +1,8 @@
+@sexpr
+; 标准库演示：range / map / filter / reduce
+(println (str (range 0 10)))
+(println (str (map square (range 1 6))))
+(println (str (filter (fn (x) (= 0 (% x 2))) (range 0 10))))
+(println (str (sum (range 1 101))))
+(println (str (reduce * 1 (range 1 6))))
+(println (str (take 3 (drop 2 (range 0 10)))))

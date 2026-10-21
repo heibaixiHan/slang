@@ -1,0 +1,3 @@
+@sexpr
+; 实验包 B：后加载，直接覆盖 A 的 add
+(defn add (a b) (list "B" (+ a b)))

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slang-lang"
+dynamic = ["version"]
+description = "slang：可自举、任意定义可覆盖、带 C++ 词法核心的极简编程语言"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "tomli>=1.1; python_version < '3.11'",
+]
+keywords = ["language", "interpreter", "lisp", "dsl"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Lisp",
+]
+
+[project.scripts]
+slang = "slang.cli:main"
+
+[tool.setuptools]
+packages = ["slang", "slang.stdlib"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"slang.stdlib" = ["builds/*.lang.build", "builds/*.toml"]
+
+[tool.setuptools.dynamic]
+version = { attr = "slang.__version__" }

@@ -1,0 +1,278 @@
+# slang ffi 默认兼容配置
+#
+# 直接导入模式（(ffi.python "math") / (ffi.c "libm.so")）使用这里的规则：
+#   - [python] 决定成员的可见性与值转换
+#   - [c]      决定默认调用约定与缺省类型
+#   - [libs.*] 是常见 C 库的默认签名表（libm / libc）
+#
+# 配置文件导入模式（(ffi.import "spec.toml")）可以覆盖这些默认值；
+# 规格文件里写 `uses-default = true` 时还会把这里的同名库签名合并进来。
+#
+# 注意：这个文件是“兼容性默认值”，不是安全边界。slang 的设计是权限极高，
+# 导入哪个库、调用什么函数完全由程序显式决定。
+
+version = 1
+
+# ---------------------------------------------------------------- Python
+[python]
+# 是否允许访问 _ 开头的私有成员（默认只导出公开成员）
+include-private = false
+# 单次调用里列表/字典最多转换多少项（超出截断）
+max-items = 1000
+# 容器最大递归深度
+max-depth = 4
+# bytes 与 str 互转使用的编码
+bytes-encoding = "utf-8"
+# 明确不导出的成员（即使 include-private = true）
+deny = ["__loader__", "__spec__", "__builtins__", "__cached__"]
+
+# ---------------------------------------------------------------- C
+[c]
+# 默认调用约定：cdecl / stdcall / win64（ctypes 支持的前缀）
+calling-convention = "cdecl"
+# 函数声明缺省返回值（args 必须显式声明）
+default-restype = "int"
+
+# ---------------------------------------------------------------- libm
+[libs.libm]
+# 依次尝试的库名（第一个能加载的成功）
+names = ["m", "libm.so.6", "libm.so", "libm.dylib", "libm"]
+
+[libs.libm.functions.sqrt]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.cbrt]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.sin]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.cos]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.tan]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.asin]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.acos]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.atan]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.atan2]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.sinh]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.cosh]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.tanh]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.exp]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.exp2]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.log]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.log2]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.log10]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.pow]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.fabs]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.floor]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.ceil]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.round]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.trunc]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.fmod]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.remainder]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.hypot]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.copysign]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.fdim]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.fmax]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.fmin]
+restype = "double"
+args = ["double", "double"]
+
+[libs.libm.functions.tgamma]
+restype = "double"
+args = ["double"]
+
+[libs.libm.functions.lgamma]
+restype = "double"
+args = ["double"]
+
+# ---------------------------------------------------------------- libc
+[libs.libc]
+names = ["c", "libc.so.6", "libc.so", "libc.dylib", "libc"]
+
+[libs.libc.structs.div_t]
+fields = [["quot", "int"], ["rem", "int"]]
+
+[libs.libc.structs.ldiv_t]
+fields = [["quot", "long"], ["rem", "long"]]
+
+[libs.libc.functions.strlen]
+restype = "size_t"
+args = ["char*"]
+
+[libs.libc.functions.strcmp]
+restype = "int"
+args = ["char*", "char*"]
+
+[libs.libc.functions.strncmp]
+restype = "int"
+args = ["char*", "char*", "size_t"]
+
+[libs.libc.functions.strchr]
+restype = "char*"
+args = ["char*", "int"]
+
+[libs.libc.functions.strstr]
+restype = "char*"
+args = ["char*", "char*"]
+
+[libs.libc.functions.atoi]
+restype = "int"
+args = ["char*"]
+
+[libs.libc.functions.atol]
+restype = "long"
+args = ["char*"]
+
+[libs.libc.functions.atof]
+restype = "double"
+args = ["char*"]
+
+[libs.libc.functions.abs]
+restype = "int"
+args = ["int"]
+
+[libs.libc.functions.labs]
+restype = "long"
+args = ["long"]
+
+[libs.libc.functions.getpid]
+restype = "int"
+args = []
+
+[libs.libc.functions.rand]
+restype = "int"
+args = []
+
+[libs.libc.functions.srand]
+restype = "void"
+args = ["uint"]
+
+[libs.libc.functions.malloc]
+restype = "void*"
+args = ["size_t"]
+
+[libs.libc.functions.calloc]
+restype = "void*"
+args = ["size_t", "size_t"]
+
+[libs.libc.functions.free]
+restype = "void"
+args = ["void*"]
+
+[libs.libc.functions.memcpy]
+restype = "void*"
+args = ["void*", "void*", "size_t"]
+
+[libs.libc.functions.memset]
+restype = "void*"
+args = ["void*", "int", "size_t"]
+
+[libs.libc.functions.puts]
+restype = "int"
+args = ["char*"]
+
+[libs.libc.functions.printf]
+restype = "int"
+args = ["char*"]
+varargs = true
+
+[libs.libc.functions.toupper]
+restype = "int"
+args = ["int"]
+
+[libs.libc.functions.tolower]
+restype = "int"
+args = ["int"]
+
+[libs.libc.functions.time]
+restype = "long"
+args = ["void*"]
+
+[libs.libc.functions.div]
+restype = "struct:div_t"
+args = ["int", "int"]
+
+[libs.libc.functions.ldiv]
+restype = "struct:ldiv_t"
+args = ["long", "long"]

@@ -1,0 +1,8 @@
+@some-future-format
+; 这段代码声明了一个“未适配”的格式。
+; 通用转换器会尝试解析它，并在运行前打印警告。
+print("来自自动转换格式的问候\n")
+def(total, 1 + 2 * 3)
+print("total = ")
+print(total)
+print("\n")

@@ -1,0 +1,31 @@
+@sexpr
+; 内置 log 模块演示
+;
+; log 必须显式 (import "log") 才会存在；它不在 slang.toml 的 builds.files 里，
+; 也不会被自动加载 —— 就像 Python 3 里要 import json 才有 json 模块。
+;
+; 运行：python3 -m slang run examples/log_demo.lang
+; 生成的日志文件：examples/log_demo.jsonl（JSON Lines，一行一个事件）
+
+(def lg (import "log"))
+
+(println (concat "日志已启动? " (str (lg.enabled))))
+
+; 打开日志：路径按“写这条语句的源文件目录”解析。
+; 第二个参数是字符上限（默认 500，0 表示不截断），第三个参数是模式（"w" 截断 / "a" 追加）。
+(lg.start "log_demo.jsonl")
+
+; 一些普通行为会被自动记录：定义、调用、set、load/import、print……
+(def counter 0)
+(defn bump () (do (set counter (+ counter 1)) counter))
+(bump)
+(bump)
+
+; 也可以手动记录事件
+(lg.info "阶段完成" (concat "counter = " (str counter)))
+(lg.event "自定义事件" 42)
+(lg.warn "这是一条警告")
+
+(println "日志在 examples/log_demo.jsonl")
+(lg.stop)
+(println (concat "日志已关闭? " (str (lg.enabled))))

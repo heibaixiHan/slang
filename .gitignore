@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+core/build/
+examples/log_demo.jsonl
+*.decoded.lang

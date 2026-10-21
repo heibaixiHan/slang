@@ -1,0 +1,4 @@
+@sexpr
+; 最简单的程序：格式声明 + 打印
+(println "hello from slang语言!")
+(println (concat "1 + 2 * 3 = " (str (+ 1 (* 2 3)))))

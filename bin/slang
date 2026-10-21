@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# slang 命令行包装器：不依赖当前目录。
+# 逐级解析符号链接，保证从任意位置调用都能找到项目根。
+self=$0
+while [ -L "$self" ]; do
+    link=$(readlink "$self")
+    case $link in
+        /*) self=$link ;;
+        *)  self=$(dirname -- "$self")/$link ;;
+    esac
+done
+DIR=$(CDPATH= cd -- "$(dirname -- "$self")/.." && pwd)
+PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m slang "$@"

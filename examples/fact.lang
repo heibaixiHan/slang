@@ -1,0 +1,9 @@
+@sexpr
+; 递归 + 条件
+(defn fact (n)
+  (if (<= n 1)
+      1
+      (* n (fact (- n 1)))))
+
+(println (concat "fact(10) = " (str (fact 10))))
+(println (concat "fact(20) = " (str (fact 20))))

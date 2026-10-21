@@ -1,0 +1,12 @@
+@sexpr
+; 程序内加载演示：覆盖模式（后加载者胜出）
+(println "加载 pack_a 之前:")
+(println (add 1 2))
+
+(load "override_packs/pack_a.lang.build")
+(println "加载 pack_a 之后:")
+(println (add 1 2))
+
+(load "override_packs/pack_b.lang.build")
+(println "加载 pack_b 之后（B 覆盖了 A）:")
+(println (add 1 2))

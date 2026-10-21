@@ -1,0 +1,17 @@
+# Python 配置文件导入示例
+#
+# exports 里写 Python 名；[rename] 额外提供 slang 别名。
+# 没在 exports / rename 里出现的成员不会导出。
+
+kind = "python"
+module = "json"
+exports = ["dumps", "loads"]
+
+[options]
+max-items = 100
+max-depth = 4
+bytes-encoding = "utf-8"
+
+[rename]
+"编码" = "dumps"
+"解码" = "loads"

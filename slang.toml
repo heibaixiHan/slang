@@ -1,0 +1,15 @@
+# slang 语言项目配置
+#
+# 加载顺序：builds.files 按数组顺序依次求值进同一个环境。
+# 后加载的文件直接覆盖先加载的同名定义（没有“保护”一说）。
+
+[project]
+name = "slang语言"
+version = "0.5.0"
+main = "examples/hello.lang"
+
+[builds]
+files = [
+  "builds/base.lang.build",
+  "builds/std.lang.build",
+]

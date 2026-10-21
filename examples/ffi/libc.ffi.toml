@@ -1,0 +1,20 @@
+# C 配置文件导入示例
+#
+# uses-default = false 表示不合并默认配置里的 libc 签名，
+# 只绑定本文件声明的函数和结构体。
+# 非 ASCII 的 TOML 键要用引号： [functions."根号"]
+
+kind = "c"
+library = "c"
+uses-default = false
+
+[structs.div_t]
+fields = [["quot", "int"], ["rem", "int"]]
+
+[functions.div]
+restype = "struct:div_t"
+args = ["int", "int"]
+
+[functions.strlen]
+restype = "size_t"
+args = ["char*"]

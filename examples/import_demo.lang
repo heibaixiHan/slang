@@ -1,0 +1,14 @@
+@sexpr
+; 模块化导入演示（类似 Python 的 import）
+(def math (import "modules/math.lang.build"))
+
+(println (concat "math.square(6) = " (str (math.square 6))))
+(println (concat "math.cube(3)   = " (str (math.cube 3))))
+(println (concat "math.pi        = " (str math.pi)))
+
+; 模块里的名字不会污染当前环境：
+; 取消下面一行的注释会得到“未定义的名称 square”
+; (println (square 6))
+
+; 当前环境里的 square 来自 std.lang.build，与模块互不干扰
+(println (concat "std.square(7)  = " (str (square 7))))
