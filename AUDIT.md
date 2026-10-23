@@ -21,6 +21,8 @@
 
 > 后续：0.5.0 新增 `.slang` 人类友好前端与 `slang decode`，并优化解释器热路径（测试 **121/121 通过**）；`log` / `ffi` 的显式导入约束与 Batch 1–5 结论不变，详见 `CHANGELOG.md` 与 `docs/slang-format.md`。
 
+> 后续：0.6.0 统一标准库到 `slang/stdlib/`，新增 Python/C 包装、Flask 风格 Web、`.slang.module.inline` 缓存/安全内联和 `logger`（测试 **139/139 通过**）；本条以下的历史路径/行号保留为当时审计记录。
+
 ### Batch 1：环境 / 模块模型重构 ✅
 
 | 条目 | 修复内容 | 验证 |
@@ -71,7 +73,7 @@
 | M-9 | `writefile` 改原子写（临时文件 + `os.replace`） | 代码审阅 |
 | 新增 | 调用深度上限 2000 层，超出给可读错误而不是 Python `RecursionError` | 代码审阅 |
 | M-8 | 相对路径**严格**按“语句所在文件目录”解析，不再回退项目根/cwd；模块与文件统一用 `realpath` | 测试：项目根同名文件不再被误加载 |
-| 新增 | 随包发布内置 base/std（`slang/stdlib/builds/`），无项目配置时也能运行；与项目 `builds/` 保持同步 | 测试：一致性 + 无项目运行 |
+| 新增 | 随包发布内置 base/std（`slang/stdlib/`），无项目配置时也能运行；与项目 `slang.toml` 的 `builds.files` 保持同步 | 测试：一致性 + 无项目运行 |
 | P1-4 | `bin/slang` 逐级解析符号链接；`make test` 依赖 `core`；新增 `make test-python` | 手工复验 |
 
 ### 新增设施：内置 `log` 模块 ✅
@@ -159,7 +161,7 @@
 
 ### P0-1 条件与布尔体系不可用 ✅
 
-**位置**：`slang/interp.py:292-315`（`deref_node`/`_p_ifc`）、`builds/base.lang.build:24-34`
+**位置**：`slang/interp.py:292-315`（`deref_node`/`_p_ifc`）、`slang/stdlib/core/base.lang.build:24-34`
 
 **复现**：
 
@@ -217,7 +219,7 @@
 
 ### P1-1 宏系统半成品：环境错位、不能生成代码、`quote` 不可用 ✅/🔁
 
-**位置**：`slang/interp.py:252-258,285-290,339-342,350-367`、`builds/base.lang.build:14,17`
+**位置**：`slang/interp.py:252-258,285-290,339-342,350-367`、`slang/stdlib/core/base.lang.build:14,17`
 
 - ✅ 宏内 `def` 不定义到调用者：`(defmacro m (n v) (def n v))` 调用后 `z` 未定义；
 - ✅ 宏内 `if` 把原始 AST 当条件：`(pick 0)` 和 `(pick 5)` 都返回 `11`；
@@ -232,7 +234,7 @@
 
 ### P1-2 `set` 不是赋值，闭包状态无法更新 ✅
 
-**位置**：`builds/base.lang.build:11`、`slang/env.py:25-27`
+**位置**：`slang/stdlib/core/base.lang.build:11`、`slang/env.py:25-27`
 
 ```lisp
 (def x 1)
@@ -275,7 +277,7 @@
 
 ### P1-5 「一切可覆盖」无依赖隔离，静默弄坏 std/base ✅
 
-**位置**：`builds/std.lang.build:7-44`、`builds/base.lang.build:37-88`
+**位置**：`slang/stdlib/core/std.lang.build:7-44`、`slang/stdlib/core/base.lang.build:37-88`
 
 ```lisp
 (defn = (a b) 1)
@@ -293,7 +295,7 @@
 
 ### P1-6 stdlib 在千级元素崩溃 + O(n²) + 慢 ✅/🔁
 
-**位置**：`builds/std.lang.build:7-28`、`slang/interp.py:546-551`
+**位置**：`slang/stdlib/core/std.lang.build:7-28`、`slang/interp.py:546-551`
 
 - ✅ `range 0 1400` 正常；`range 0 1440` → `递归太深`；
 - 🔁 二分实测上限：`range/map/reduce` ≈1426，`filter` ≈950；`cons` 为 `[x]+xs`，从尾部构造是 O(n²)；

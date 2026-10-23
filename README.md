@@ -1,10 +1,10 @@
 # slang 语言
 
-一个为「适配不同编程项目」而设计的极简编程语言（v0.5.0）。
+一个为「适配不同编程项目」而设计的极简编程语言（v0.6.0）。
 
 - **双前端**：`.lang` 是严格 S 表达式；`.slang` 是缩进 + 中缀 + f-string 的人类友好格式。两者生成同一棵 AST，`slang decode` 可把 `.slang` 导出为等价的 `.lang`（规范见 `docs/slang-format.md`）。
 - **底层**：Python 负责解析/求值/加载等复杂且易变的部分；C++ 负责稳定、性能敏感的词法分析（编译一次，长期使用）。
-- **自举**：核心只提供 `%` 开头的原子操作。`def`、`if`、`add`、`println` 这些“语言本身”全部由 `builds/base.lang.build` 定义。
+- **自举**：核心只提供 `%` 开头的原子操作。`def`、`if`、`add`、`println` 这些“语言本身”全部由 `slang/stdlib/core/base.lang.build` 定义。
 - **权限极高**：环境里没有任何受保护的条目。后加载的 `.lang.build` 直接覆盖先加载的同名定义；程序自己也能覆盖任何东西。标准库内部改用 `%` 原语实现关键操作，因此覆盖 `=`、`if`、`+` 不会意外弄坏 `map`/`reduce` 等（见「覆盖与绑定时机」；`.slang` 的语法关键字在语法层保留，详见格式规范）。
 - **多格式**：文件首行用 `@格式名` 声明语法；`.slang` 扩展名自动识别，未适配的格式由通用转换器兜底，并在运行前警告。
 - **两种加载模式**：覆盖（override）与模块化导入（import，模块只看到固定的 base/std 快照，实现真隔离）。
@@ -55,7 +55,7 @@ pip install -e .
 slang run examples/hello.lang
 ```
 
-运行项目外的单文件时：若文件所在目录（或它的父目录）没有 `slang.toml`，运行器会退回当前目录的项目；两者都没有时，会加载**随包发布的内置 base/std**（`slang/stdlib/builds/`），因此 `println`、`def` 等依然可用：
+运行项目外的单文件时：若文件所在目录（或它的父目录）没有 `slang.toml`，运行器会退回当前目录的项目；两者都没有时，会加载**随包发布的内置 base/std**（`slang/stdlib/core/`），因此 `println`、`def` 等依然可用：
 
 ```sh
 python3 -m slang run "$TMPDIR/plain.lang"      # Termux 无 /tmp；项目外建议用绝对路径
@@ -67,14 +67,14 @@ python3 -m slang --project /path/to/slang.toml run /path/to/program.lang
 ```toml
 [project]
 name = "slang语言"
-version = "0.5.0"
+version = "0.6.0"
 main = "examples/hello.lang"
 
 [builds]
 # 按数组顺序依次加载；后加载者直接覆盖先加载的同名定义
 files = [
-  "builds/base.lang.build",
-  "builds/std.lang.build",
+  "slang/stdlib/core/base.lang.build",
+  "slang/stdlib/core/std.lang.build",
 ]
 ```
 
@@ -91,7 +91,7 @@ files = [
 2. 按 builds.files 顺序加载 .lang.build（直接覆盖模式，同一个全局环境）
        └─ base.lang.build：用 % 原语自举出 def / if / fn / add / println ...
        └─ std.lang.build ：标准库（内部关键操作直接用 % 原语）
-   （找不到 slang.toml 时改为加载随包发布的内置 base/std，见 slang/stdlib/builds/）
+   （找不到 slang.toml 时改为加载随包发布的内置 base/std，见 slang/stdlib/core/）
 3. 运行程序文件（同一环境，因此程序可以覆盖任意已有定义）
        └─ 程序里还可以再用 load / import / load-config 动态加载
 4. 程序内的相对路径（load / import / load-config / readfile / writefile / log.start）
@@ -199,6 +199,49 @@ python3 -m slang run examples/log_demo.lang   # 生成 examples/log_demo.jsonl
 
 ---
 
+## 分级日志（`logger` 模块）
+
+`logger` 是内置模块，和 `log` 不同：`log` 记录解释器审计事件（JSON Lines）；`logger` 是普通程序日志，按级别过滤。它不会自动加载，必须显式 import。
+
+```lisp
+@sexpr
+(def logger (import "logger"))
+
+(logger.debug "detail")       ; 默认被过滤
+(logger.info "start")         ; 默认被过滤
+(logger.warning "careful")    ; 默认输出
+(logger.set_level "debug")    ; 阈值降到最低，之后所有级别都输出
+(logger.info "all visible")
+```
+
+级别从低到高是 `debug < info < warning < error < critical`。默认阈值是 `warning`；把阈值设为最低的 `debug` 就会输出所有级别。默认写入 **stderr**，不会污染程序 stdout。
+
+| 接口 | 说明 |
+| --- | --- |
+| `(logger.set_level 级别)` | 设置阈值；接受 `debug/info/warning/error/critical`（大小写不敏感）或对应整数；返回旧级别名 |
+| `(logger.get_level)` | 当前阈值名，例如 `WARNING` |
+| `(logger.debug 消息 [数据])` | 输出 debug；`info/warning/warn/error/critical/fatal` 同理 |
+| `(logger.log 级别 消息 [数据])` | 按指定级别输出 |
+| `(logger.enabled 级别)` | 当前阈值下该级别是否会输出 |
+| `(logger.set_stream "stdout"\|"stderr")` | 切换输出流，返回旧值 |
+| `(logger.set_format 格式)` | 自定义格式，可用 `{level}`、`{message}`、`{name}` |
+| `(logger.levels)` | 返回所有标准级别名 |
+| `(logger.reset)` | 恢复 warning / stderr / 默认格式 |
+
+### `.lang.build` 版本
+
+`slang/stdlib/logger.lang.build` 是同一 logger 的构建片段版本：它把 `log-set-level`、`log-debug`、`log-warning` 等便捷函数直接放进根环境，默认也是 warning。
+
+```lisp
+(load "logger.build")
+(log-set-level "debug")
+(log-debug "hello")
+```
+
+这个文件本身就是“基础定义可替换”的示例：项目可以复制/修改它来改默认级别，或者取消文件末尾的注释，把根环境里的 `println` 接到 `logger.warning`。
+
+---
+
 ## 外部库（`ffi` 模块）
 
 `ffi` 是**内置模块**，同样不会自动加载，也不在 `slang.toml` 的 `builds.files` 里；必须显式 `(import "ffi")`。它把 Python 模块和 C 动态库包装成 slang 里的“模块”，用同样的 `名字.成员` 语法访问。
@@ -207,7 +250,7 @@ python3 -m slang run examples/log_demo.lang   # 生成 examples/log_demo.jsonl
 
 | 模式 | 写法 | 转译规则来自 |
 | --- | --- | --- |
-| 直接导入 | `(ffi.python "math")` / `(ffi.c "m")` | 随包默认兼容配置 `slang/stdlib/builds/ffi_default.toml`；Python 自动发现公开成员，常见 C 库（libm/libc）使用内置签名表 |
+| 直接导入 | `(ffi.python "math")` / `(ffi.c "m")` | 随包默认兼容配置 `slang/stdlib/ffi_default.toml`；Python 自动发现公开成员，常见 C 库（libm/libc）使用内置签名表 |
 | 配置文件导入 | `(ffi.import "spec.toml")` | 由 TOML 指定 `kind`、模块/库名、导出、重命名、C 函数签名、结构体等 |
 
 ### Python
@@ -373,6 +416,157 @@ println(f"fib(20) = {fib(20)}")
 
 ---
 
+## 标准库与三类源码
+
+标准库统一放在 `slang/stdlib/`。按扩展名区分三类源码（外加一种生成缓存）：
+
+| 类别 | 扩展名 | 语义 | 示例 |
+| --- | --- | --- | --- |
+| 构建片段 | `.lang.build` | `load` / `load-config` 直接求值进目标环境；后加载覆盖先加载，可以替换基础定义 | `core/base.lang.build`、`logger.lang.build` |
+| 模块库 | `.lang` | `import` 得到隔离模块；模块只看到启动时的内置快照 | `python/os.lang`、`c/math.lang`、`web/flask.lang` |
+| 前端库/程序 | `.slang` | 人类友好格式，同样可以 `import` / `load` | `examples/slang_math.slang` |
+| 生成缓存 | `.slang.module.inline` | 解析/内联缓存，自动生成，不手写、不提交 | `foo.lang.slang.module.inline` |
+
+`slang/stdlib/` 的布局：
+
+```
+slang/stdlib/
+├── core/                 # base.lang.build / std.lang.build
+├── python/               # Python 标准库常用封装（*.lang）
+├── c/                    # C libc/libm 常用封装（*.lang）
+├── web/                  # Flask 风格 Web 框架（*.lang + Python 运行时）
+├── ffi.py                # 内置 ffi 模块
+├── log.py                # 内置审计日志模块
+├── logger.py             # 内置分级日志模块
+├── logger.lang.build     # logger 的 build 版本
+├── ffi_default.toml      # ffi 默认签名表
+└── registry.py           # 标准库逻辑名与类别注册表
+```
+
+常用逻辑导入名：
+
+```lisp
+(import "python.os")       ; 或 (import "std.python.os")
+(import "c.math")          ; 或 (import "std.c.math")
+(import "flask")           ; 或 (import "web.flask")
+(import "logger")          ; 内置分级日志
+(load "logger.build")      ; .lang.build 版本：把便捷函数放进根环境
+```
+
+本地文件优先：如果调用方目录/项目里存在同名文件，`import` 不会抢到标准库。例如项目根有 `python.math.lang`、`python.math.slang` 或 `python/math.lang` 时，`(import "python.math")` 会加载它。
+
+---
+
+## Python / C 标准库包装
+
+`slang/stdlib/python/` 和 `slang/stdlib/c/` 是刻意精选的常用接口，不是完整 1:1 镜像；它们是普通 `.lang` 模块，显式 import，本地同名文件优先。
+
+| Python 包装 | 主要内容 |
+| --- | --- |
+| `python.os` | `getenv/getcwd/getpid/listdir`、`name/sep/linesep/path` |
+| `python.sys` | `argv/version/version_info/platform/executable/path/modules/maxsize/stdin/stdout/stderr` |
+| `python.json` | `loads/dumps/load/dump/dumps_pretty/read/write` |
+| `python.re` | `compile/search/match/findall/finditer/sub/split/escape` |
+| `python.time` | `time/time_ns/sleep/monotonic/perf_counter/strftime/strptime` 等 |
+| `python.random` | `random/randint/randrange/choice/choices/shuffle/sample/uniform/seed` |
+| `python.subprocess` | `run/call/check_call/check_output/Popen` 与 `PIPE/STDOUT/DEVNULL` |
+| `python.pathlib` | `exists/isfile/isdir/abspath/basename/dirname/listdir/glob/mkdir/remove/rename/read_text/write_text` 等 |
+| `python.math` | 常用常数与 `sqrt/pow/exp/log/三角函数/floor/ceil/isnan/isinf` 等 |
+
+```lisp
+@sexpr
+(def os (import "python.os"))
+(def json (import "python.json"))
+(println (os.getenv "HOME"))
+(println (json.dumps (json.loads "{\"a\": 1}")))
+```
+
+C 包装覆盖 `c.stdio`（`puts/printf/putchar/getchar`）、`c.stdlib`（`atoi/atof/abs/rand/getenv/system/exit/sleep` 等）、`c.string`（`strlen/strcmp/strchr/strstr/memcpy/memset` 等）、`c.math`（libm 常用函数）和 `c.time`（`clock/ctime/asctime`）。
+
+```lisp
+(def math (import "c.math"))
+(println (str (math.sqrt 9)))
+```
+
+这些包装底层仍使用 `ffi`：Python 异常会带源文件位置，C 函数签名来自内置表。需要未封装的成员时，直接 `(ffi.python "模块")` / `(ffi.c "库")` 即可。
+
+---
+
+## Web（Flask 风格）
+
+`flask`（也可以 `web.flask` / `std.web.flask`）是标准库里的轻量 Web 框架，路由、请求、响应、静态文件、钩子、错误处理、CORS、服务端 session 和简单模板都可用。
+
+```lisp
+@sexpr
+(def web (import "flask"))
+(def app (web.app "demo" "templates" "static"))
+
+(web.get app "/" (fn (req) (web.text "hello")))
+(web.get app "/user/<name>" (fn (req)
+  (web.text (concat "hello " (web.param req "name")))))
+(web.get app "/n/<int:n>" (fn (req)
+  (web.json (list (list "n" (+ (web.param req "n") 1))))))
+(web.post app "/echo" (fn (req) (web.json (web.json_body req))))
+(web.static app "/assets" "static")
+
+(web.run app "127.0.0.1" 8080)
+```
+
+| 能力 | 接口 |
+| --- | --- |
+| 路由 | `get/post/put/delete/patch/any/route`；路径支持 `<name>`、`<int:name>`、`<float:name>`、`<path:name>` |
+| 请求 | `query/param/header_of/cookie_of/body/json_body/form` |
+| 响应 | `text/html/json/redirect/send_file`，`status/header/cookie` |
+| 静态文件 | `(web.static app 前缀 目录)`；自动处理 MIME、HEAD、404 |
+| 钩子 | `(web.before app fn)`、`(web.after app fn)`；before 返回空列表/nil 表示继续 |
+| 错误 | `(web.error app 404 fn)` |
+| 分组 | `(web.group app "/api")`，之后 `(web.get group ...)` |
+| CORS | `(web.cors app "*")`，可带 methods/headers |
+| Session | 服务端 session + 签名 ID cookie；`session_get/session_set/session_clear` |
+| 模板 | `(web.render app "index.html" context)` / `(web.render_kv app "index.html" key value ...)`；支持变量、`for`、`if/else`、常见过滤器 |
+
+测试或脚本里可以用 `(web.handle app "GET" "/path")` 直接拿响应对象，不监听端口；`(web.start app "127.0.0.1" 0)` 启动后台服务并返回 server（`(web.url server)`、`(web.stop server)`），`web.run` 则阻塞运行。端口 `0` 表示让系统分配。
+
+这是开发用 HTTP 服务，没有 TLS、进程管理或生产级限流；生产部署应在前面放反向代理，或把业务逻辑接到成熟服务器。
+
+---
+
+## 模块内联缓存（`.slang.module.inline`）
+
+每次导入 `.lang` / `.slang` 模块时，slang 会在源文件旁检查：
+
+```
+<源文件>.slang.module.inline
+```
+
+缓存第一行保存源文件 SHA-256：
+
+```
+SLANG-INLINE 1 <64 位十六进制 sha256>
+{...JSON AST...}
+```
+
+源文件、解析模式或优化器版本变化时哈希不一致，缓存会自动重新生成；普通解析结果与缓存结果语义一致。缓存文件是纯 JSON AST，不执行代码；损坏、只读目录、权限不足或磁盘错误都会自动回退到正常解析，不会影响程序。
+
+缓存里的轻量内联刻意保守，只处理安全情形：
+
+- 同一模块内**顶层作用域**的调用（不进入函数体）、固定参数、单表达式、只使用内置纯函数/参数的函数；
+- 实参只能是数字/字符串/nil 字面量，避免变量未绑定、重复求值或副作用顺序变化；
+- 函数被 `set`、重复定义，或模块里出现 `load` / `eval` / `defmacro` 时不内联；
+- 不做常量折叠，因为 slang 允许覆盖 `+` / `*` 等基础定义；内联只替换函数调用，不改变名字的运行时解析。
+- 内联发生在宏展开前，且不会进入 `if`/`when`/`and`/`or`/`do` 的参数；如果项目把基础名字覆盖成会检查原始 AST 的宏，或需要 `log` 记录每一次函数调用，请用 `SLANG_NO_INLINE_CACHE=1` 保留原始调用。
+- 缓存文件与源文件同等信任：能改写同目录缓存的人通常也能改写源文件；不要从不信任的目录加载缓存。
+
+关闭缓存：
+
+```sh
+SLANG_NO_INLINE_CACHE=1 python3 -m slang run main.lang
+```
+
+`.slang.module.inline` 已加入 `.gitignore`，不要手写或提交。
+
+---
+
 ## 文件格式与自动转换
 
 格式声明必须**单独占一行**（可以在前面写 shebang 或留空行）；声明行后同一行再写代码会直接报错，不会被静默丢弃。UTF-8 BOM 会被自动跳过。
@@ -449,7 +643,7 @@ print(total)
 (println (len xs))            ; 3
 (println (nth xs 1))          ; 2
 
-; 标准库（builds/std.lang.build；由批量原语实现，可处理十万级列表）
+; 标准库（slang/stdlib/core/std.lang.build；由批量原语实现，可处理十万级列表）
 (range 0 5)                   ; [0 1 2 3 4]
 (map square (range 1 4))      ; [1 4 9]
 (filter (fn (x) (> x 2)) xs)  ; 谓词自定
@@ -548,13 +742,18 @@ slang语言/
 │   ├── native.py           # C++ 核心 ctypes 桥（ABI 校验、回退、缓存管理）
 │   ├── tomlcompat.py       # tomllib/tomli/内置极简解析
 │   ├── cli.py              # run / check / lex / decode / version
-│   └── stdlib/
-│       ├── log.py          # 内置 log 模块（必须显式 import）
-│       ├── ffi.py          # 内置 ffi 模块：导入 Python / C 库（必须显式 import）
-│       └── builds/         # 随包发布的内置 base/std + ffi 默认兼容配置
-├── builds/
-│   ├── base.lang.build     # 引导层：语言从这里诞生
-│   └── std.lang.build      # 标准库
+│   ├── inline.py           # .slang.module.inline 缓存 + 轻量安全内联
+│   └── stdlib/             # 统一标准库
+│       ├── core/           # base.lang.build / std.lang.build
+│       ├── python/         # Python 标准库常用封装
+│       ├── c/              # C libc/libm 常用封装
+│       ├── web/            # Flask 风格 Web 框架
+│       ├── ffi.py          # 内置 ffi 模块（必须显式 import）
+│       ├── log.py          # 内置审计日志（必须显式 import）
+│       ├── logger.py       # 内置分级日志（必须显式 import）
+│       ├── logger.lang.build
+│       ├── ffi_default.toml
+│       └── registry.py     # 逻辑名/别名/类别注册表
 ├── core/
 │   ├── slang_core.cpp      # C++ 词法器（C ABI v2：显式长度 + 数值原文）
 │   ├── Makefile            # make -C core
@@ -566,7 +765,7 @@ slang语言/
 │   ├── slang_demo.slang    # .slang 综合示例
 │   ├── slang_math.slang    # 供示例导入的 .slang 模块
 │   └── ffi/                # ffi 配置文件示例（json.ffi.toml / libc.ffi.toml）
-├── tests/test_slang.py     # 端到端测试（121 个）
+├── tests/test_slang.py     # 端到端测试（139 个）
 └── bin/slang               # 命令行包装器（自动解析符号链接）
 ```
 
@@ -598,7 +797,7 @@ make test
 make test-python
 ```
 
-121 个端到端测试覆盖：示例输出、条件/布尔语义（裸变量、`true/false/nil`、遮蔽）、嵌套宏与宏参数名冲突、`and/or/when` 短路返回值、`set` 与闭包状态、宏环境、多表达式函数体、字符串名称、转义与续行、`sort/split/join/substr`、覆盖隔离、十万级列表、auto 模式（`1 +2`/`1 -2`/`1 %2`、空参数、顶层逗号）、重复参数名与变长参数位置、空函数体、定义名含 `.`、大整数与位数上限、NUL 路径、模块相对加载、函数内 load/load-config、import 缓存、错误定位与调用链、循环加载、模块隔离（主程序全局不可见、`a.b.c` 嵌套、成员不泄漏）、BOM/shebang、裸 CR 归一化、同行声明报错、项目发现、相对路径严格按源文件目录解析、`check --project` 只解析不执行、警告去重、readfile 相对路径、`log` 模块（显式 import / 不自动加载 / 事件内容 / 追加模式）、`ffi` 模块（显式 import / 不自动加载 / Python 直接导入与配置导入 / 重命名与导出 / 本地 .py / Python 异常定位 / Python 回调 / C 直接导入 / C 签名与结构体 / 变参 printf / malloc+指针读取 / 运行时 ffi.bind / 两参数覆盖配置 / 句柄关闭 / 默认配置合法性 / 错误配置）、`.slang` 格式（综合语法、`@slang` 头、显式 `@sexpr` 覆盖扩展名、`.lang`/`.slang` 混合加载与导入、`.slang` 构建文件、模块 import/from、宏、控制流、运算符优先级、字符串/插值、f-string 空白与花括号、`\x`/`\u` 转义、原始字符串反斜杠、数字与续行、赋值/变长参数、嵌套函数/行内块、块 lambda、相对 load、decode 往返、非有限浮点 decode、check/lex、Unicode/CRLF、空文件、缩进与语法错误）、TOML 兜底解析、内置构建与项目构建一致性，以及 C++/Python 两套词法器的逐 token 一致性（含 600 条固定种子的随机差分语料）。
+139 个端到端测试覆盖：示例输出、条件/布尔语义（裸变量、`true/false/nil`、遮蔽）、嵌套宏与宏参数名冲突、`and/or/when` 短路返回值、`set` 与闭包状态、宏环境、多表达式函数体、字符串名称、转义与续行、`sort/split/join/substr`、覆盖隔离、十万级列表、auto 模式（`1 +2`/`1 -2`/`1 %2`、空参数、顶层逗号）、重复参数名与变长参数位置、空函数体、定义名含 `.`、大整数与位数上限、NUL 路径、模块相对加载、函数内 load/load-config、import 缓存、错误定位与调用链、循环加载、模块隔离（主程序全局不可见、`a.b.c` 嵌套、成员不泄漏）、BOM/shebang、裸 CR 归一化、同行声明报错、项目发现、相对路径严格按源文件目录解析、`check --project` 只解析不执行、警告去重、readfile 相对路径、`log` 模块（显式 import / 不自动加载 / 事件内容 / 追加模式）、`ffi` 模块（显式 import / 不自动加载 / Python 直接导入与配置导入 / 重命名与导出 / 本地 .py / Python 异常定位 / Python 回调 / C 直接导入 / C 签名与结构体 / 变参 printf / malloc+指针读取 / 运行时 ffi.bind / 两参数覆盖配置 / 句柄关闭 / 默认配置合法性 / 错误配置）、`.slang` 格式（综合语法、`@slang` 头、显式 `@sexpr` 覆盖扩展名、`.lang`/`.slang` 混合加载与导入、`.slang` 构建文件、模块 import/from、宏、控制流、运算符优先级、字符串/插值、f-string 空白与花括号、`\x`/`\u` 转义、原始字符串反斜杠、数字与续行、赋值/变长参数、嵌套函数/行内块、块 lambda、相对 load、decode 往返、非有限浮点 decode、check/lex、Unicode/CRLF、空文件、缩进与语法错误）、TOML 兜底解析、内置构建与项目构建一致性、标准库 Python/C 包装、Flask 风格 Web、`.slang.module.inline` 缓存/内联/失效回退、`logger` 级别过滤，以及 C++/Python 两套词法器的逐 token 一致性（含 600 条固定种子的随机差分语料）。
 
 ---
 
@@ -613,6 +812,8 @@ make test-python
 - [ ] `check` 只解析不执行；`--project` 会校验配置与构建文件（同样不执行）；`lex` 仅用于调试，输出严格 JSON（非有限浮点写成 `"Infinity"`/`"NaN"` 字符串）。
 - [ ] 求值器未迁入 C++；没有尾调用优化，也没有 `while`。
 - [ ] 无 REPL；没有字典/结构体**字面量**、标准输入、异常捕获；`sort` 只支持自然序与双参数比较函数。`ffi` 可以返回 dict / C 结构体对象，但没有对应的源码字面量语法。
+- [ ] `.slang.module.inline` 只做顶层作用域、固定参数、字面量实参的安全内联；不做跨模块内联或常量折叠。宏覆盖、需要完整 `log` 调用轨迹或缓存目录不可信时，用 `SLANG_NO_INLINE_CACHE=1`。
+- [ ] Web 是开发用 HTTP 服务（无 TLS、限流、进程管理）；生产能力请放在反向代理/成熟服务器后面。
 - [ ] `ffi` 的 C 侧不会解析头文件：直接导入只覆盖默认配置里的 libm/libc 常见符号，其他库需要写 TOML 签名或用 `ffi.bind` 逐个绑定；`T*` 返回值是带类型的指针，长度需要调用方自己知道，数组越界/悬垂指针不做检查；可变参数只支持数字/字符串/指针，结构体嵌套数组与 C++ 符号（name mangling）暂不支持。
 - [ ] Python 调用只支持位置参数（没有关键字参数语法，可用 `functools.partial` 或配置文件重命名包装）；Python 的迭代器/生成器会作为不透明对象返回，不会自动展开。
 - [ ] `log` 只记录解释器层面的行为（定义、调用、加载、打印、错误），不做用户级审计或回放；日志里的值会被截断到字符上限（默认 500），列表/字典最多渲染 50 项。

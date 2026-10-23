@@ -1,5 +1,50 @@
 # 更新记录
 
+> 注：0.6.0 起旧版的顶层 `builds/` 路径迁移到 `slang/stdlib/core/`；下方历史版本条目保留当时的路径与测试数。
+
+## 0.6.0 — 2026-10-23
+
+标准库统一与模块优化版：把标准库收敛到 `slang/stdlib/`，新增 Python/C 常用包装、Flask 风格 Web、`.slang.module.inline` 解析/内联缓存和分级 `logger`；测试 121 → **139**，全部通过。
+
+### 标准库与三类源码
+
+- 标准库统一到 `slang/stdlib/`：`core/`（base/std 构建片段）、`python/`、`c/`、`web/`，以及 `ffi.py`、`log.py`、`logger.py`、`ffi_default.toml`、`registry.py`。
+- 按扩展名正式区分：`.lang.build`（构建/覆盖片段）、`.lang`（S 表达式模块库）、`.slang`（人类友好前端库/程序）；`.slang.module.inline` 是生成缓存，不是源码。
+- 逻辑导入名：`python.*` / `std.python.*`、`c.*` / `std.c.*`、`flask` / `web.flask` / `std.web.flask`、`logger.build`；本地同名文件优先于标准库。
+- 删除旧的顶层 `builds/` 和 `slang/stdlib/builds/`，不保留兼容路径；`slang.toml`、loader、测试和打包元数据切换到新目录。
+
+### Python / C 包装
+
+- 新增 `python.os`、`python.sys`、`python.json`、`python.re`、`python.time`、`python.random`、`python.subprocess`、`python.pathlib`、`python.math`。
+- 新增 `c.stdio`、`c.stdlib`、`c.string`、`c.math`、`c.time`；运行时仍走 `ffi.bind`。
+- JSON/pathlib 使用小型 Python helper，保证相对路径按 cwd 解析，而不是按标准库模块目录解析。
+
+### Flask 风格 Web
+
+- 新增 `web/server.py`、`server.ffi.toml`、`flask.lang`；支持路由和 `<name>` / `<int:>` / `<float:>` / `<path:>` 转换器。
+- 请求/响应：query、path、header、cookie、JSON/form/body，text/html/JSON/redirect/file，状态码与响应头。
+- 静态文件、before/after 钩子、错误处理、路由 group、CORS、服务端 session。
+- 简单模板：变量、过滤器、`for`、`if/else`；`handle` 可直接测试，`start`/`stop`/`url` 管理后台 HTTP 服务，`run` 阻塞运行。
+
+### `.slang.module.inline` 缓存
+
+- 每个 `.lang` / `.slang` 模块在源文件旁生成 `<源文件>.slang.module.inline`；第一行保存源文件 SHA-256，源文件/解析模式/优化器版本变化时自动重建。
+- 缓存是纯 JSON AST，不执行代码；损坏、只读目录、权限不足或磁盘错误自动回退正常解析。
+- 保守内联：同一模块顶层、固定参数、单表达式、纯内置函数、字面量实参；`set`/重复定义/`load`/`eval`/`defmacro` 时禁用。不做常量折叠，避免破坏可覆盖的基础定义。
+- `SLANG_NO_INLINE_CACHE=1` 可关闭；缓存文件已加入 `.gitignore`。
+
+### `logger` 模块
+
+- 新增内置 `logger`（显式 import），级别 `debug < info < warning < error < critical`，默认 `warning`；阈值设为 `debug` 输出所有信息。
+- 支持 `set_level/get_level/enabled/log/set_stream/set_format/reset`，默认写 stderr。
+- 新增 `logger.lang.build`：把 `log-set-level`、`log-debug` 等便捷函数放进根环境，并展示如何覆盖基础 `println`。
+
+### 测试、版本与打包
+
+- 测试 121 → 139：新增标准库别名/本地优先、Python/C 包装、Web handle/真实 HTTP/模板/静态/session/hooks、缓存命中/失效/损坏回退/关闭、内联重定义安全、logger 级别与 build 版本。
+- 版本 0.5.0 → 0.6.0；C++ 核心源码未变，仍为 `0.5.0-cpp` / ABI v2。
+- wheel 包数据加入 `*.lang.build`、`web/*.ffi.toml`，并验证 `core/`、`python/`、`c/`、`web/`、`ffi_default.toml` 均随包发布。
+
 ## 0.5.0 — 2026-10-21
 
 人类友好格式与性能版：新增 `.slang` 缩进式前端和 `slang decode`，两者生成同一棵 AST；解释器热路径优化，`fib(24)` / `reduce 200k` 约提升 2.8–3.6 倍；测试 97 → 121，全部通过。
