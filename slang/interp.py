@@ -1,7 +1,7 @@
 """slang 解释器核心：求值器 + %-原语。
 
 核心只提供以 % 开头的原子操作；`def`、`if`、`add` 这些用户可见的东西
-全部由 builds/base.lang.build 定义，因此可以被后加载的文件随意覆盖。
+全部由 slang/stdlib/core/base.lang.build 定义，因此可以被后加载的文件随意覆盖。
 
 调用规则：
 - 普通函数（%lambda 创建）的实参先求值；
@@ -193,7 +193,7 @@ class Interp:
         self.bootstrapping = False
 
     def _builtin_module_names(self):
-        return {"log", "ffi"}
+        return {"log", "ffi", "logger"}
 
     def load_builtin_module(self, name):
         """加载显式 import 的内置模块；不会自动注入根环境。"""
@@ -203,6 +203,8 @@ class Interp:
             from .stdlib.log import build_module
         elif name == "ffi":
             from .stdlib.ffi import build_module
+        elif name == "logger":
+            from .stdlib.logger import build_module
         else:
             raise LoadError("未知的内置模块 %r" % name)
 

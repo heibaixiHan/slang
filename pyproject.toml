@@ -27,12 +27,14 @@ include-package-data = true
 [tool.setuptools.package-data]
 "slang.stdlib" = [
     "core/*.lang.build",
+    "*.lang.build",
     "python/*.lang",
     "python/*.py",
     "python/*.ffi.toml",
     "c/*.lang",
     "web/*.lang",
     "web/*.py",
+    "web/*.ffi.toml",
     "*.toml",
 ]
 

@@ -2,6 +2,7 @@
 
 运行：python3 -m unittest discover -s tests -v
 """
+import hashlib
 import json
 import math
 import os
@@ -38,9 +39,11 @@ def zlib_available():
 _HAS_ZLIB = zlib_available()
 
 
-def run_slang(*args, cwd=ROOT):
+def run_slang(*args, cwd=ROOT, extra_env=None):
     env = dict(os.environ)
     env["PYTHONPATH"] = ROOT + os.pathsep + env.get("PYTHONPATH", "")
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run(
         [sys.executable, "-m", "slang"] + list(args),
         cwd=cwd,
@@ -1161,7 +1164,7 @@ class TestPackaging(unittest.TestCase):
     def test_version_reports_both_backends(self):
         proc = run_slang("version")
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("0.5.0", proc.stdout)
+        self.assertIn("0.6.0", proc.stdout)
         if cpp_available():
             self.assertIn("0.5.0-cpp", proc.stdout)
         proc = run_slang("version", "--no-native")
@@ -1564,7 +1567,7 @@ class TestStdlibModules(_TmpDirMixin, unittest.TestCase):
 
     def test_stdlib_alias_and_local_precedence(self):
         local = self.write_program(
-            "python.math",
+            "python.math.lang",
             "@sexpr\n(def value 123)\n",
         )
         path = self.write_program(
@@ -1695,6 +1698,202 @@ class TestStdlibModules(_TmpDirMixin, unittest.TestCase):
         proc = run_slang("run", path)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("hello-http", proc.stdout)
+
+
+class TestInlineCache(_TmpDirMixin, unittest.TestCase):
+    def test_cache_created_and_simple_call_inlined(self):
+        source = ("""@sexpr
+(defn square (x) (* x x))
+(println (str (square 5)))
+""")
+        path = self.write_program("inline_mod.lang", source)
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(normalize(proc.stdout), "25\n")
+        cache = path + ".slang.module.inline"
+        self.assertTrue(os.path.isfile(cache), cache)
+        digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        with open(cache, "r", encoding="utf-8") as fh:
+            header = fh.readline().rstrip("\n")
+            payload = json.load(fh)
+        self.assertEqual(header, "SLANG-INLINE 1 " + digest)
+        self.assertEqual(payload["source_sha256"], digest)
+        body = json.dumps(payload["nodes"], ensure_ascii=False)
+        # 定义处还保留 square；顶层调用已经被展开成 (* 5 5)。
+        self.assertEqual(body.count('"square"'), 1, body)
+
+    def test_cache_invalidates_on_source_change(self):
+        path = self.write_program(
+            "inline_change.lang",
+            "@sexpr\n(defn square (x) (* x x))\n(println (str (square 5)))\n",
+        )
+        first = run_slang("run", path)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        cache = path + ".slang.module.inline"
+        with open(cache, "r", encoding="utf-8") as fh:
+            first_header = fh.readline().rstrip("\n")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("@sexpr\n(defn square (x) (* x x 2))\n(println (str (square 5)))\n")
+        second = run_slang("run", path)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(normalize(second.stdout), "50\n")
+        with open(cache, "r", encoding="utf-8") as fh:
+            second_header = fh.readline().rstrip("\n")
+        self.assertNotEqual(first_header, second_header)
+
+    def test_corrupt_cache_falls_back(self):
+        path = self.write_program(
+            "inline_corrupt.lang",
+            "@sexpr\n(defn add (a b) (+ a b))\n(println (str (add 2 3)))\n",
+        )
+        first = run_slang("run", path)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        cache = path + ".slang.module.inline"
+        with open(cache, "w", encoding="utf-8") as fh:
+            fh.write("not a cache\n{broken")
+        second = run_slang("run", path)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(normalize(second.stdout), "5\n")
+        with open(cache, "r", encoding="utf-8") as fh:
+            self.assertTrue(fh.readline().startswith("SLANG-INLINE 1 "))
+
+    def test_inline_is_disabled_for_redefinition_and_set(self):
+        path = self.write_program(
+            "inline_redef.lang",
+            """@sexpr
+(defn f (x) (+ x 1))
+(println (str (f 1)))
+(defn f (x) (+ x 10))
+(println (str (f 1)))
+(set f (fn (x) (+ x 100)))
+(println (str (f 1)))
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(normalize(proc.stdout), "2\n11\n101\n")
+
+    def test_inline_respects_parameter_shadowing(self):
+        # 参数名遮蔽内置 list 时，函数体里的 (list 1) 是在调用参数，
+        # 不能把它当作内置 list 内联成 [1]。
+        path = self.write_program(
+            "inline_shadow.lang",
+            "@sexpr\n(defn f (list) (list 1))\n(println (str (f 5)))\n",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("list 不可调用", proc.stderr)
+
+    def test_inline_disabled_when_module_defines_macro(self):
+        # 宏可以检查/延迟求值参数，模块里出现 defmacro 时整模块不做内联，
+        # 保留调用 AST 给宏展开阶段。
+        source = """@sexpr
+(defmacro identity-macro (x) x)
+(defn square (x) (* x x))
+(println (str (square 5)))
+"""
+        path = self.write_program("inline_macro.lang", source)
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(normalize(proc.stdout), "25\n")
+        with open(path + ".slang.module.inline", "r", encoding="utf-8") as fh:
+            fh.readline()
+            payload = json.load(fh)
+        body = json.dumps(payload["nodes"], ensure_ascii=False)
+        # 定义处和调用处都保留 square，说明没有在宏展开前改 AST。
+        self.assertEqual(body.count('"square"'), 2, body)
+
+    def test_slang_module_uses_same_cache(self):
+        path = self.write_program(
+            "inline_front.slang",
+            "def square(x) = x * x\nprintln(str(square(7)))\n",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(normalize(proc.stdout), "49\n")
+        self.assertTrue(os.path.isfile(path + ".slang.module.inline"))
+
+    def test_cache_can_be_disabled(self):
+        path = self.write_program(
+            "inline_disabled.lang",
+            "@sexpr\n(defn f (x) (+ x 1))\n(println (str (f 1)))\n",
+        )
+        proc = run_slang("run", path, extra_env={"SLANG_NO_INLINE_CACHE": "1"})
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(normalize(proc.stdout), "2\n")
+        self.assertFalse(os.path.exists(path + ".slang.module.inline"))
+
+    def test_library_kinds(self):
+        from slang.stdlib import registry
+        self.assertEqual(registry.kind_of("a.lang.build"), registry.KIND_BUILD)
+        self.assertEqual(registry.kind_of("a.lang"), registry.KIND_LANG)
+        self.assertEqual(registry.kind_of("a.slang"), registry.KIND_SLANG)
+        self.assertEqual(registry.kind_of("a.slang.module.inline"), registry.KIND_INLINE)
+        self.assertEqual(registry.kind_of("a.toml"), registry.KIND_UNKNOWN)
+
+
+class TestLoggerModule(_TmpDirMixin, unittest.TestCase):
+    def test_default_warning_and_debug_level(self):
+        path = self.write_program(
+            "logger_default.lang",
+            """@sexpr
+(def logger (import "logger"))
+(logger.debug "d")
+(logger.info "i")
+(logger.warning "w")
+(logger.error "e")
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("[WARNING] w", proc.stderr)
+        self.assertIn("[ERROR] e", proc.stderr)
+        self.assertNotIn("[DEBUG] d", proc.stderr)
+        self.assertNotIn("[INFO] i", proc.stderr)
+
+        path = self.write_program(
+            "logger_debug.lang",
+            """@sexpr
+(def logger (import "logger"))
+(logger.set_stream "stdout")
+(logger.set_level "debug")
+(logger.debug "d")
+(logger.info "i")
+(logger.warning "w")
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("[DEBUG] d", proc.stdout)
+        self.assertIn("[INFO] i", proc.stdout)
+        self.assertIn("[WARNING] w", proc.stdout)
+
+    def test_logger_build_file(self):
+        path = self.write_program(
+            "logger_build.lang",
+            """@sexpr
+(load "logger.build")
+(log-set-level "debug")
+(log-set-level "debug")
+(log-debug "build-d")
+(log-error "build-e")
+(println (concat "level=" (log-get-level)))
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("[DEBUG] build-d", proc.stderr)
+        self.assertIn("[ERROR] build-e", proc.stderr)
+        self.assertIn("level=DEBUG", proc.stdout)
+
+    def test_logger_invalid_level(self):
+        path = self.write_program(
+            "logger_bad.lang",
+            '@sexpr\n(def logger (import "logger"))\n(logger.set_level "nope")\n',
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("未知日志级别", proc.stderr)
 
 
 class TestSlangFormat(_TmpDirMixin, unittest.TestCase):

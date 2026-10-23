@@ -1,15 +1,21 @@
-"""配置 (.toml) 与源文件 (.lang.build / .lang) 的加载器。
+"""配置 (.toml) 与源文件 (.lang.build / .lang / .slang) 的加载器。
 
 加载顺序（覆盖语义）：
     slang.toml 里的 builds.files 按数组顺序依次求值进同一个环境，
     后加载的定义直接覆盖先加载的同名定义；程序文件最后求值，
     同样可以覆盖任意已有定义。
 
+库/源码类别（按扩展名）：
+    .lang.build  构建/覆盖片段，直接求值进目标环境；
+    .lang        S 表达式模块库，可 import 成隔离模块；
+    .slang       人类友好前端库/程序，同样可 import；
+    .slang.module.inline 自动生成的解析/内联缓存，不是源码。
+
 模块语义（0.3.0 起）：
     import 得到一个独立模块。模块始终只看到 base/std/启动配置构建出的
     固定内置快照（interp.module_base），看不到主程序在导入前后定义的全局
     变量。因此 import 顺序不会改变模块里的自由变量；模块之间需要协作时
-    显式 import。内置模块（目前是 log/ffi）也必须显式 import，不会自动加载。
+    显式 import。内置模块（log/ffi/logger）也必须显式 import，不会自动加载。
     标准库模块（python.* / c.* / web.* / flask）同样显式 import。
 
 相对路径解析基准是“写这条 load/import 语句的源文件目录”；
@@ -17,7 +23,7 @@
 """
 import os
 
-from . import formats, native, tomlcompat
+from . import formats, inline, native, tomlcompat
 from .stdlib import registry as stdlib_registry
 from .ast_nodes import to_source
 from .env import Env
@@ -27,7 +33,7 @@ from .parser import parse
 CONFIG_TOP_KEYS = {"project", "builds", "build"}
 PROJECT_KEYS = {"name", "version", "main"}
 BUILDS_KEYS = {"files"}
-BUILTIN_MODULES = {"log", "ffi"}
+BUILTIN_MODULES = {"log", "ffi", "logger"}
 
 
 def read_source(path):
@@ -77,14 +83,30 @@ def read_nodes(interp, path, warn=True):
     if warning and warn:
         interp.warn(warning)
 
-    if mode == "slang":
-        from . import slangfmt
-        nodes = slangfmt.parse(body, path)
-        return nodes, mode, fmt_name, "slang"
+    kind = stdlib_registry.kind_of(path)
+    use_cache = kind in (stdlib_registry.KIND_LANG, stdlib_registry.KIND_SLANG)
 
-    tokens, backend = native.lex_with_fallback(body, mode, path)
-    nodes = parse(tokens, mode, path)
-    return nodes, mode, fmt_name, backend
+    def parse_fn():
+        if mode == "slang":
+            from . import slangfmt
+            parse_fn.backend = "slang"
+            return slangfmt.parse(body, path)
+        tokens, backend = native.lex_with_fallback(body, mode, path)
+        parse_fn.backend = backend
+        return parse(tokens, mode, path)
+
+    backend = "?"
+    if use_cache:
+        nodes, from_cache = inline.load_or_generate(
+            path, text, mode, fmt_name, parse_fn
+        )
+        backend = "inline" if from_cache else getattr(parse_fn, "backend", "?")
+        _trace(interp, "inline.hit" if from_cache else "inline.miss",
+               path=path, kind=kind)
+        return nodes, mode, fmt_name, backend
+
+    nodes = parse_fn()
+    return nodes, mode, fmt_name, getattr(parse_fn, "backend", "?")
 
 
 def _load_stack(interp):
@@ -109,8 +131,16 @@ def _is_builtin_name(path):
 
 
 def _stdlib_path_for(interp, path, base_dir):
-    """本地文件优先；只有本地找不到时才解析标准库逻辑名。"""
+    """本地文件优先；只有本地找不到时才解析标准库逻辑名。
+
+    对 ``python.math`` 这类逻辑名，本地可以放 ``python.math``、
+    ``python.math.lang``、``python.math.slang`` 或 ``python/math.lang``；
+    这些都算“同名本地文件”，优先于标准库。
+    """
     if os.path.isabs(path):
+        return None
+    target = stdlib_registry.resolve(path)
+    if target is None:
         return None
     candidates = []
     if base_dir is not None:
@@ -122,10 +152,17 @@ def _stdlib_path_for(interp, path, base_dir):
         if interp.project_root:
             candidates.append(interp.project_root)
         candidates.append(os.getcwd())
+    clean = path[4:] if path.startswith("std.") else path
+    names = [path, clean, path.replace(".", os.sep), clean.replace(".", os.sep)]
     for directory in candidates:
-        if directory and os.path.isfile(os.path.join(directory, path)):
-            return None
-    return stdlib_registry.resolve(path)
+        if not directory:
+            continue
+        for name in names:
+            for suffix in ("", ".lang", ".slang", ".lang.build"):
+                candidate = os.path.join(directory, name + suffix)
+                if os.path.isfile(candidate):
+                    return os.path.abspath(candidate)
+    return target
 
 
 def load_file(interp, path, mode="override", target_env=None, base_dir=None, origin_node=None):

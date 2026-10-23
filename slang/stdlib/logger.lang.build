@@ -1,0 +1,28 @@
+@sexpr
+; logger 的 .lang.build 版本：直接加载进根环境，而不是隔离模块。
+;
+; 用法（在项目构建文件或程序里）：
+;   (load "logger.build")
+;   (log-warning "hello")
+;   (log-set-level "debug")
+;
+; 这个文件本身就是“基础定义可替换”的示例：它把 root 里的 logger 绑定、
+; 便捷函数和默认级别暴露出来，项目可以复制/修改它，甚至替换 println。
+(def logger (import "logger"))
+
+; 默认级别：warning（debug/info 默认不输出）。
+(logger.set_level "warning")
+
+(defn log-set-level (level) (logger.set_level level))
+(defn log-get-level () (logger.get_level))
+(defn log-enabled (level) (logger.enabled level))
+(defn log-debug (message) (logger.debug message))
+(defn log-info (message) (logger.info message))
+(defn log-warning (message) (logger.warning message))
+(defn log-error (message) (logger.error message))
+(defn log-critical (message) (logger.critical message))
+
+; 可选：把根环境里的 println 改接到 logger.warning。
+; 取消下一行注释即可体验“基础文件/定义可被库覆盖”。
+; (def _logger-base-println println)
+; (defn println (x) (logger.warning x))
