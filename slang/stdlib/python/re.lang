@@ -1,0 +1,14 @@
+@sexpr
+; Python re 标准库的常用封装。
+; 用法：(def re (import "python.re")) 然后 (re.findall "\\d+" text)
+(def _ffi (import "ffi"))
+(def _re (_ffi.python "re"))
+
+(def compile _re.compile)
+(def search _re.search)
+(def match _re.match)
+(def findall _re.findall)
+(def finditer _re.finditer)
+(def sub _re.sub)
+(def split _re.split)
+(def escape _re.escape)

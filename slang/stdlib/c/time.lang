@@ -1,0 +1,16 @@
+@sexpr
+; C time.h 的常用封装。
+; 用法：(def ctime (import "c.time")) 然后 (ctime.time)
+(def _ffi (import "ffi"))
+(def _c (_ffi.c "c"))
+
+; libc 的 time(void*) 在 C 里通常传 NULL 获取当前时间。
+(defn time () (_c.time (_ffi.null)))
+
+; 默认签名表之外的小函数，按需补充绑定。
+(_ffi.bind _c "clock" "long" (list))
+(_ffi.bind _c "ctime" "char*" (list "void*"))
+(_ffi.bind _c "asctime" "char*" (list "void*"))
+(def clock _c.clock)
+(def ctime _c.ctime)
+(def asctime _c.asctime)

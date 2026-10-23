@@ -9,7 +9,8 @@
     import 得到一个独立模块。模块始终只看到 base/std/启动配置构建出的
     固定内置快照（interp.module_base），看不到主程序在导入前后定义的全局
     变量。因此 import 顺序不会改变模块里的自由变量；模块之间需要协作时
-    显式 import。内置模块（目前是 log）也必须显式 import，不会自动加载。
+    显式 import。内置模块（目前是 log/ffi）也必须显式 import，不会自动加载。
+    标准库模块（python.* / c.* / web.* / flask）同样显式 import。
 
 相对路径解析基准是“写这条 load/import 语句的源文件目录”；
 不再回退到项目根或 cwd，避免误加载项目外的同名文件。
@@ -17,6 +18,7 @@
 import os
 
 from . import formats, native, tomlcompat
+from .stdlib import registry as stdlib_registry
 from .ast_nodes import to_source
 from .env import Env
 from .errors import LoadError
@@ -106,6 +108,26 @@ def _is_builtin_name(path):
     return path in BUILTIN_MODULES
 
 
+def _stdlib_path_for(interp, path, base_dir):
+    """本地文件优先；只有本地找不到时才解析标准库逻辑名。"""
+    if os.path.isabs(path):
+        return None
+    candidates = []
+    if base_dir is not None:
+        candidates.append(base_dir)
+    else:
+        cur_dir = getattr(interp, "current_dir", None)
+        if cur_dir:
+            candidates.append(cur_dir)
+        if interp.project_root:
+            candidates.append(interp.project_root)
+        candidates.append(os.getcwd())
+    for directory in candidates:
+        if directory and os.path.isfile(os.path.join(directory, path)):
+            return None
+    return stdlib_registry.resolve(path)
+
+
 def load_file(interp, path, mode="override", target_env=None, base_dir=None, origin_node=None):
     """加载一个源文件。
 
@@ -113,7 +135,14 @@ def load_file(interp, path, mode="override", target_env=None, base_dir=None, ori
     mode="import"   在隔离的模块环境里求值，并返回该模块环境
                     （同一真实路径只执行一次）。
     base_dir 是相对路径的解析基准（通常是发起 load 的语句所在目录）。
+
+    ``std.python.os`` / ``python.os`` / ``flask`` 这类逻辑名会先查标准库；
+    调用方目录或项目里存在同名文件时，本地文件优先。
     """
+    stdlib_path = _stdlib_path_for(interp, path, base_dir)
+    if stdlib_path is not None:
+        path = stdlib_path
+        base_dir = os.path.dirname(stdlib_path)
     lock = getattr(interp, "load_lock", None)
     if lock is not None:
         with lock:
@@ -332,8 +361,9 @@ def load_builtin_runtime(interp):
     """没有项目配置时加载随包发布的内置 base/std。
 
     这不等于自动加载 log 模块：内置模块仍只由显式 (import "log") 触发。
+    标准库统一位于 ``slang/stdlib/core``。
     """
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stdlib", "builds")
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stdlib", "core")
     files = [os.path.join(base, "base.lang.build"), os.path.join(base, "std.lang.build")]
     missing = [p for p in files if not os.path.exists(p)]
     if missing:

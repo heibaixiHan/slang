@@ -1,0 +1,14 @@
+@sexpr
+; Python subprocess 标准库的常用封装。
+; 用法：(def sp (import "python.subprocess")) 然后 (sp.check_output (list "uname" "-a"))
+(def _ffi (import "ffi"))
+(def _sp (_ffi.python "subprocess"))
+
+(def run _sp.run)
+(def call _sp.call)
+(def check_call _sp.check_call)
+(def check_output _sp.check_output)
+(def Popen _sp.Popen)
+(def PIPE _sp.PIPE)
+(def STDOUT _sp.STDOUT)
+(def DEVNULL _sp.DEVNULL)

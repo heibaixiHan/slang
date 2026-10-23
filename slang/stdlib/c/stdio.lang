@@ -1,0 +1,14 @@
+@sexpr
+; C stdio 的常用封装。
+; 用法：(def stdio (import "c.stdio")) 然后 (stdio.printf "value=%d\n" 42)
+(def _ffi (import "ffi"))
+(def _c (_ffi.c "c"))
+
+(def puts _c.puts)
+(def printf _c.printf)
+
+; 默认签名表之外的小函数，按需补充绑定。
+(_ffi.bind _c "putchar" "int" (list "int"))
+(_ffi.bind _c "getchar" "int" (list))
+(def putchar _c.putchar)
+(def getchar _c.getchar)

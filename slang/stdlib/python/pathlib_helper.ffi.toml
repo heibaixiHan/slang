@@ -1,0 +1,8 @@
+kind = "python"
+module = "pathlib_helper.py"
+exports = ["read_text", "write_text"]
+
+[options]
+max-items = 1000000
+max-depth = 32
+bytes-encoding = "utf-8"

@@ -3,7 +3,7 @@
 两种导入模式
 ============
 
-1. 直接导入（使用随包发布的默认兼容配置 ``builds/ffi_default.toml``）
+1. 直接导入（使用随包发布的默认兼容配置 ``ffi_default.toml``）
 
        (def math (ffi.python "math"))     ; Python 模块：自动发现公开成员
        (def libm (ffi.c "libm.so"))       ; C 动态库：使用默认签名表（libm/libc）
@@ -57,7 +57,7 @@
   list/tuple/set→list、dict→dict、其他对象→不透明句柄（可继续访问属性）。
 * slang -> Python：[]→[]、数字/字符串原样、list/dict 递归转换、
   ForeignObject→底层对象、Prim/UserFn→Python 回调。
-* C 类型：见 ``builds/ffi_default.toml`` 的 ``[c]`` 与 ``[libs.*]``。
+* C 类型：见 ``ffi_default.toml`` 的 ``[c]`` 与 ``[libs.*]``。
 
 安全提示：导入外部库等于获得该库的全部能力。slang 不做沙箱；只导入你信任的库。
 """
@@ -79,7 +79,7 @@ DEFAULT_CONFIG_FILE = "ffi_default.toml"
 # --------------------------------------------------------------------------
 def default_config_path():
     return os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "builds", DEFAULT_CONFIG_FILE
+        os.path.dirname(os.path.abspath(__file__)), DEFAULT_CONFIG_FILE
     )
 
 

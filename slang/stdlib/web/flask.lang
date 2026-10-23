@@ -1,0 +1,171 @@
+@sexpr
+; Flask 风格 Web 框架（标准库，显式 import）。
+;
+; 基本用法：
+;   (def web (import "flask"))
+;   (def app (web.app "demo"))
+;   (web.get app "/" (fn (req) (web.text "hello")))
+;   (web.get app "/user/<name>" (fn (req)
+;       (web.text (concat "hello " (web.param req "name")))))
+;   (web.run app "127.0.0.1" 8080)
+;
+; 也可用 (import "web.flask") 或 (import "std.web.flask")。
+(def _ffi (import "ffi"))
+(def _s (_ffi.import "server.ffi.toml"))
+
+; ---------- 应用 ----------
+(defn app (name rest...)
+  (if (> (len rest) 0)
+      (if (> (len rest) 1)
+          (_s.new_app name (first rest) (nth rest 1))
+          (_s.new_app name (first rest)))
+      (_s.new_app name)))
+
+(defn route (target methods path handler)
+  (_s.add_route target methods path handler))
+
+(defn get (target path handler)
+  (_s.add_route target "GET" path handler))
+
+(defn post (target path handler)
+  (_s.add_route target "POST" path handler))
+
+(defn put (target path handler)
+  (_s.add_route target "PUT" path handler))
+
+(defn delete (target path handler)
+  (_s.add_route target "DELETE" path handler))
+
+(defn patch (target path handler)
+  (_s.add_route target "PATCH" path handler))
+
+(defn any (target path handler)
+  (_s.add_route target "GET,POST,PUT,DELETE,PATCH,OPTIONS" path handler))
+
+(defn before (target handler) (_s.add_before target handler))
+(defn after (target handler) (_s.add_after target handler))
+(defn error (target code handler) (_s.add_error target code handler))
+(defn static (target prefix directory) (_s.add_static target prefix directory))
+(defn group (target prefix) (_s.group target prefix))
+
+(defn cors (target rest...)
+  (if (= (len rest) 0)
+      (_s.cors target)
+      (if (= (len rest) 1)
+          (_s.cors target (first rest))
+          (if (= (len rest) 2)
+              (_s.cors target (first rest) (nth rest 1))
+              (_s.cors target (first rest) (nth rest 1) (nth rest 2))))))
+
+(defn debug (target rest...)
+  (if (> (len rest) 0)
+      (_s.set_debug target (first rest))
+      (_s.set_debug target)))
+
+; ---------- 响应 ----------
+(defn text (body rest...)
+  (if (> (len rest) 0)
+      (_s.text body (first rest))
+      (_s.text body)))
+
+(defn html (body rest...)
+  (if (> (len rest) 0)
+      (_s.html_response body (first rest))
+      (_s.html_response body)))
+
+(defn json (value rest...)
+  (if (> (len rest) 0)
+      (_s.json_response value (first rest))
+      (_s.json_response value)))
+
+(defn redirect (location rest...)
+  (if (> (len rest) 0)
+      (_s.redirect location (first rest))
+      (_s.redirect location)))
+
+(defn send_file (path rest...)
+  (if (> (len rest) 0)
+      (_s.send_file path (first rest))
+      (_s.send_file path)))
+
+(defn status (response code) (_s.set_status response code))
+(defn header (response name value) (_s.set_header response name value))
+(defn cookie (response name value rest...)
+  (if (> (len rest) 0)
+      (_s.set_cookie response name value (first rest))
+      (_s.set_cookie response name value)))
+
+; ---------- 请求 ----------
+(defn query (req name rest...)
+  (if (> (len rest) 0)
+      (_s.request_query req name (first rest))
+      (_s.request_query req name)))
+
+(defn param (req name rest...)
+  (if (> (len rest) 0)
+      (_s.request_param req name (first rest))
+      (_s.request_param req name)))
+
+(defn header_of (req name rest...)
+  (if (> (len rest) 0)
+      (_s.request_header req name (first rest))
+      (_s.request_header req name)))
+
+(defn cookie_of (req name rest...)
+  (if (> (len rest) 0)
+      (_s.request_cookie req name (first rest))
+      (_s.request_cookie req name)))
+
+(defn body (req) req.body)
+(defn json_body (req) (_s.request_json req))
+(defn form (req name rest...)
+  (if (> (len rest) 0)
+      (_s.request_form req name (first rest))
+      (_s.request_form req name)))
+
+; ---------- Session ----------
+(defn session_get (req key rest...)
+  (if (> (len rest) 0)
+      (_s.session_get req key (first rest))
+      (_s.session_get req key)))
+
+(defn session_set (req response key value)
+  (_s.session_set req response key value))
+
+(defn session_clear (req response) (_s.session_clear req response))
+
+; ---------- 模板 ----------
+(defn render (target name context) (_s.render target name context))
+(defn render_kv (target name pairs...) (_s.render_kv target name pairs))
+
+; ---------- 测试 / 服务器 ----------
+(defn handle (target method path rest...)
+  (if (> (len rest) 0)
+      (_s.handle target method path (first rest))
+      (_s.handle target method path)))
+
+(defn handle_headers (target method path body headers)
+  (_s.handle target method path body headers))
+
+(defn run (target rest...)
+  (if (= (len rest) 0)
+      (_s.run target)
+      (if (= (len rest) 1)
+          (_s.run target (first rest))
+          (_s.run target (first rest) (nth rest 1)))))
+
+(defn start (target rest...)
+  (if (= (len rest) 0)
+      (_s.start target)
+      (if (= (len rest) 1)
+          (_s.start target (first rest))
+          (_s.start target (first rest) (nth rest 1)))))
+
+(defn stop (server) (_s.stop server))
+(defn url (server) (_s.url server))
+
+(defn response_status (response) (_s.response_status response))
+(defn response_text (response) (_s.response_text response))
+(defn response_header (response name) (_s.response_header response name))
+(defn response_json (response) (_s.response_json response))
+(defn response_cookies (response) (_s.response_cookies response))

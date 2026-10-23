@@ -1,0 +1,22 @@
+@sexpr
+; Python sys 标准库的常用封装。
+; 用法：(def sys (import "python.sys")) 然后 (sys.argv)
+(def _ffi (import "ffi"))
+(def _sys (_ffi.python "sys"))
+
+(def argv _sys.argv)
+(def version _sys.version)
+(def version_info _sys.version_info)
+(def platform _sys.platform)
+(def executable _sys.executable)
+(def path _sys.path)
+(def modules _sys.modules)
+(def maxsize _sys.maxsize)
+(def stdin _sys.stdin)
+(def stdout _sys.stdout)
+(def stderr _sys.stderr)
+
+(defn exit (code...)
+  (if (> (len code) 0)
+      (_sys.exit (first code))
+      (_sys.exit 0)))

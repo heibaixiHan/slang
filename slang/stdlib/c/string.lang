@@ -1,0 +1,15 @@
+@sexpr
+; C string.h 的常用封装。
+; 用法：(def string (import "c.string")) 然后 (string.strlen "hello")
+(def _ffi (import "ffi"))
+(def _c (_ffi.c "c"))
+
+(def strlen _c.strlen)
+(def strcmp _c.strcmp)
+(def strncmp _c.strncmp)
+(def strchr _c.strchr)
+(def strstr _c.strstr)
+(def toupper _c.toupper)
+(def tolower _c.tolower)
+(def memcpy _c.memcpy)
+(def memset _c.memset)

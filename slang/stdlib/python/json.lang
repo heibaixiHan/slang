@@ -1,0 +1,16 @@
+@sexpr
+; Python json 标准库的常用封装。
+; 用法：(def json (import "python.json")) 然后 (json.loads text)
+(def _ffi (import "ffi"))
+(def _json (_ffi.python "json"))
+(def _helper (_ffi.import "json_helper.ffi.toml"))
+
+(def loads _json.loads)
+(def dumps _json.dumps)
+(def load _json.load)
+(def dump _json.dump)
+
+; 默认参数的便利版本：中文不转义，缩进 2。
+(def dumps_pretty _helper.dumps_pretty)
+(def read _helper.read)
+(def write _helper.write)

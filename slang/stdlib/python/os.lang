@@ -1,0 +1,26 @@
+@sexpr
+; Python os 标准库的常用封装。
+; 用法：(def os (import "python.os")) 然后 (os.getenv "HOME")
+(def _ffi (import "ffi"))
+(def _os (_ffi.python "os"))
+
+(def name _os.name)
+(def sep _os.sep)
+(def linesep _os.linesep)
+(def path _os.path)
+(def getcwd _os.getcwd)
+(def getpid _os.getpid)
+(def listdir _os.listdir)
+
+(defn getenv (name rest...)
+  (if (> (len rest) 0)
+      (_os.getenv name (first rest))
+      (_os.getenv name)))
+
+(defn putenv (name value) (_os.putenv name value))
+(defn chdir (path) (_os.chdir path))
+(defn mkdir (path) (_os.mkdir path))
+(defn makedirs (path) (_os.makedirs path))
+(defn remove (path) (_os.remove path))
+(defn rename (src dst) (_os.rename src dst))
+(defn system (command) (_os.system command))

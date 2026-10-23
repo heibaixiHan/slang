@@ -1,0 +1,28 @@
+@sexpr
+; C stdlib 的常用封装。
+; 用法：(def stdlib (import "c.stdlib")) 然后 (stdlib.getenv "HOME")
+(def _ffi (import "ffi"))
+(def _c (_ffi.c "c"))
+
+(def atoi _c.atoi)
+(def atol _c.atol)
+(def atof _c.atof)
+(def abs _c.abs)
+(def labs _c.labs)
+(def rand _c.rand)
+(def srand _c.srand)
+(def getpid _c.getpid)
+(def div _c.div)
+(def ldiv _c.ldiv)
+
+; 默认签名表之外的小函数，按需补充绑定。
+(_ffi.bind _c "getenv" "char*" (list "char*"))
+(_ffi.bind _c "system" "int" (list "char*"))
+(_ffi.bind _c "exit" "void" (list "int"))
+(_ffi.bind _c "sleep" "uint" (list "uint"))
+(_ffi.bind _c "usleep" "int" (list "uint"))
+(def getenv _c.getenv)
+(def system _c.system)
+(def exit _c.exit)
+(def sleep _c.sleep)
+(def usleep _c.usleep)

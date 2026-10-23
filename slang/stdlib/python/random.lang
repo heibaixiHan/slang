@@ -1,0 +1,15 @@
+@sexpr
+; Python random 标准库的常用封装。
+; 用法：(def random (import "python.random")) 然后 (random.randint 1 6)
+(def _ffi (import "ffi"))
+(def _random (_ffi.python "random"))
+
+(def random _random.random)
+(def randint _random.randint)
+(def randrange _random.randrange)
+(def choice _random.choice)
+(def choices _random.choices)
+(def shuffle _random.shuffle)
+(def sample _random.sample)
+(def uniform _random.uniform)
+(def seed _random.seed)

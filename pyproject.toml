@@ -21,11 +21,20 @@ classifiers = [
 slang = "slang.cli:main"
 
 [tool.setuptools]
-packages = ["slang", "slang.stdlib"]
+packages = ["slang", "slang.stdlib", "slang.stdlib.web"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-"slang.stdlib" = ["builds/*.lang.build", "builds/*.toml"]
+"slang.stdlib" = [
+    "core/*.lang.build",
+    "python/*.lang",
+    "python/*.py",
+    "python/*.ffi.toml",
+    "c/*.lang",
+    "web/*.lang",
+    "web/*.py",
+    "*.toml",
+]
 
 [tool.setuptools.dynamic]
 version = { attr = "slang.__version__" }

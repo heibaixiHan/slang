@@ -1,0 +1,47 @@
+kind = "python"
+module = "server.py"
+exports = [
+  "new_app",
+  "add_route",
+  "add_before",
+  "add_after",
+  "add_error",
+  "add_static",
+  "group",
+  "cors",
+  "set_debug",
+  "text",
+  "html_response",
+  "json_response",
+  "redirect",
+  "send_file",
+  "set_status",
+  "set_header",
+  "set_cookie",
+  "request_query",
+  "request_param",
+  "request_header",
+  "request_cookie",
+  "request_json",
+  "request_form",
+  "session_get",
+  "session_set",
+  "session_clear",
+  "render",
+  "render_kv",
+  "handle",
+  "run",
+  "start",
+  "stop",
+  "url",
+  "response_status",
+  "response_text",
+  "response_header",
+  "response_json",
+  "response_cookies",
+]
+
+[options]
+max-items = 1000000
+max-depth = 64
+bytes-encoding = "utf-8"

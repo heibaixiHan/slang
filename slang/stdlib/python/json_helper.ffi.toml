@@ -1,0 +1,8 @@
+kind = "python"
+module = "json_helper.py"
+exports = ["dumps_pretty", "read", "write"]
+
+[options]
+max-items = 1000000
+max-depth = 64
+bytes-encoding = "utf-8"

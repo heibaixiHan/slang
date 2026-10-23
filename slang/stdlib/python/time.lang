@@ -1,0 +1,18 @@
+@sexpr
+; Python time 标准库的常用封装。
+; 用法：(def time (import "python.time")) 然后 (time.sleep 0.1)
+(def _ffi (import "ffi"))
+(def _time (_ffi.python "time"))
+
+(def time _time.time)
+(def time_ns _time.time_ns)
+(def sleep _time.sleep)
+(def monotonic _time.monotonic)
+(def perf_counter _time.perf_counter)
+(def process_time _time.process_time)
+(def localtime _time.localtime)
+(def gmtime _time.gmtime)
+(def strftime _time.strftime)
+(def strptime _time.strptime)
+(def ctime _time.ctime)
+(def asctime _time.asctime)

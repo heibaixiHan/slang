@@ -131,7 +131,7 @@ class TestExamples(unittest.TestCase):
         self.assertIn("total = 7", proc.stdout)
 
     def test_check(self):
-        proc = run_slang("check", "builds/base.lang.build")
+        proc = run_slang("check", "slang/stdlib/core/base.lang.build")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("OK", proc.stdout)
 
@@ -808,8 +808,8 @@ class TestLoading(_TmpDirMixin, unittest.TestCase):
         self.assertEqual(proc.stderr.count("未适配"), 1)
 
     def test_check_with_project(self):
-        base = os.path.join(ROOT, "builds", "base.lang.build")
-        std = os.path.join(ROOT, "builds", "std.lang.build")
+        base = os.path.join(ROOT, "slang", "stdlib", "core", "base.lang.build")
+        std = os.path.join(ROOT, "slang", "stdlib", "core", "std.lang.build")
         toml = self.write_program(
             "proj/slang.toml",
             "[builds]\nfiles = [%r, %r]\n" % (base, std),
@@ -835,8 +835,8 @@ class TestLoading(_TmpDirMixin, unittest.TestCase):
         self.assertEqual(proc.stdout, "hello-relative\n\n")
 
     def test_project_discovered_from_program_path(self):
-        base = os.path.join(ROOT, "builds", "base.lang.build")
-        std = os.path.join(ROOT, "builds", "std.lang.build")
+        base = os.path.join(ROOT, "slang", "stdlib", "core", "base.lang.build")
+        std = os.path.join(ROOT, "slang", "stdlib", "core", "std.lang.build")
         self.write_program(
             "proj/slang.toml",
             "[builds]\nfiles = [%r, %r, \"extra.lang.build\"]\n"
@@ -856,8 +856,8 @@ class TestLoading(_TmpDirMixin, unittest.TestCase):
 
     def test_relative_load_is_strict_to_source_directory(self):
         """相对路径只按“语句所在文件目录”解析，不再回退项目根。"""
-        base = os.path.join(ROOT, "builds", "base.lang.build")
-        std = os.path.join(ROOT, "builds", "std.lang.build")
+        base = os.path.join(ROOT, "slang", "stdlib", "core", "base.lang.build")
+        std = os.path.join(ROOT, "slang", "stdlib", "core", "std.lang.build")
         self.write_program(
             "strict/proj/slang.toml",
             "[project]\nmain = \"app/main.lang\"\n\n[builds]\nfiles = [%r, %r]\n"
@@ -887,8 +887,8 @@ class TestLoading(_TmpDirMixin, unittest.TestCase):
         self.assertEqual(proc.stdout, "999\n")
 
     def test_check_project_does_not_execute_builds(self):
-        base = os.path.join(ROOT, "builds", "base.lang.build")
-        std = os.path.join(ROOT, "builds", "std.lang.build")
+        base = os.path.join(ROOT, "slang", "stdlib", "core", "base.lang.build")
+        std = os.path.join(ROOT, "slang", "stdlib", "core", "std.lang.build")
         self.write_program(
             "checkexec/slang.toml",
             "[builds]\nfiles = [%r, %r, \"side.lang.build\"]\n" % (base, std),
@@ -911,8 +911,8 @@ class TestLoading(_TmpDirMixin, unittest.TestCase):
         self.assertIn("--project", proc.stderr)
 
     def test_check_project_only_is_allowed(self):
-        base = os.path.join(ROOT, "builds", "base.lang.build")
-        std = os.path.join(ROOT, "builds", "std.lang.build")
+        base = os.path.join(ROOT, "slang", "stdlib", "core", "base.lang.build")
+        std = os.path.join(ROOT, "slang", "stdlib", "core", "std.lang.build")
         toml = self.write_program(
             "onlyproj/slang.toml",
             "[builds]\nfiles = [%r, %r]\n" % (base, std),
@@ -1007,8 +1007,8 @@ class TestLexerBackends(_TmpDirMixin, unittest.TestCase):
         for rel in (
             "examples/hello.lang",
             "examples/auto_format_demo.lang",
-            "builds/base.lang.build",
-            "builds/std.lang.build",
+            "slang/stdlib/core/base.lang.build",
+            "slang/stdlib/core/std.lang.build",
         ):
             with self.subTest(file=rel):
                 self._assert_backends_match(os.path.join(ROOT, rel))
@@ -1131,17 +1131,15 @@ class TestLexerBackends(_TmpDirMixin, unittest.TestCase):
 
 class TestPackaging(unittest.TestCase):
     def test_builtin_builds_match_project_builds(self):
-        """随包发布的内置 base/std 必须与项目 builds/ 保持同步。"""
+        """标准库只有一份：slang/stdlib/core，slang.toml 指向它。"""
+        with open(os.path.join(ROOT, "slang.toml"), "r", encoding="utf-8") as fh:
+            config = fh.read()
         for name in ("base.lang.build", "std.lang.build"):
             with self.subTest(file=name):
-                project = os.path.join(ROOT, "builds", name)
-                builtin = os.path.join(ROOT, "slang", "stdlib", "builds", name)
-                self.assertTrue(os.path.exists(builtin), builtin)
-                with open(project, "r", encoding="utf-8") as fh:
-                    a = fh.read()
-                with open(builtin, "r", encoding="utf-8") as fh:
-                    b = fh.read()
-                self.assertEqual(a, b, name)
+                path = os.path.join(ROOT, "slang", "stdlib", "core", name)
+                self.assertTrue(os.path.exists(path), path)
+                self.assertIn("slang/stdlib/core/" + name, config)
+        self.assertFalse(os.path.exists(os.path.join(ROOT, "builds")))
 
     def test_builtin_runtime_provides_primitives_without_project(self):
         """没有 slang.toml 时，内置 base/std 仍让 println 可用。"""
@@ -1505,6 +1503,200 @@ class TestFfiModule(_TmpDirMixin, unittest.TestCase):
         self.assertIn("未知的 C 类型", proc.stderr)
 
 
+class TestStdlibModules(_TmpDirMixin, unittest.TestCase):
+    def test_python_wrappers(self):
+        path = self.write_program(
+            "stdlib_python.lang",
+            """@sexpr
+(def os (import "python.os"))
+(def sys (import "python.sys"))
+(def json (import "python.json"))
+(def re (import "python.re"))
+(def time (import "python.time"))
+(def random (import "python.random"))
+(def pathlib (import "python.pathlib"))
+(def math (import "python.math"))
+(println (concat "os=" (str (len (os.getenv "HOME")))))
+(println (concat "sys=" (str (> (len sys.platform) 0))))
+(println (concat "json=" (json.dumps (json.loads "{\\\"a\\\": 1}"))))
+(println (concat "re=" (str (re.findall "\\\\d+" "a12b34"))))
+(time.sleep 0.001)
+(println (concat "time=" (str (> (time.time) 0))))
+(println (concat "random=" (str (>= (random.randint 1 6) 1))))
+(println (concat "pathlib=" (str (pathlib.exists "README.md"))))
+(println (concat "math=" (str (math.sqrt 9))))
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = normalize(proc.stdout)
+        self.assertIn("sys=true", out)
+        self.assertIn('json={"a": 1}', out)
+        self.assertIn('re=["12" "34"]', out)
+        self.assertIn("time=true", out)
+        self.assertIn("random=true", out)
+        self.assertIn("pathlib=true", out)
+        self.assertIn("math=3", out)
+
+    def test_c_wrappers(self):
+        if not _HAS_C_LIBS:
+            self.skipTest("缺少 libc/libm")
+        path = self.write_program(
+            "stdlib_c.lang",
+            """@sexpr
+(def math (import "c.math"))
+(def stdlib (import "c.stdlib"))
+(def string (import "c.string"))
+(def stdio (import "c.stdio"))
+(println (concat "sqrt=" (str (math.sqrt 16))))
+(println (concat "strlen=" (str (string.strlen "hello"))))
+(println (concat "atoi=" (str (stdlib.atoi "42"))))
+(stdio.printf "printf=%d\\n" 7)
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = normalize(proc.stdout)
+        self.assertIn("sqrt=4", out)
+        self.assertIn("strlen=5", out)
+        self.assertIn("atoi=42", out)
+        self.assertIn("printf=7", out)
+
+    def test_stdlib_alias_and_local_precedence(self):
+        local = self.write_program(
+            "python.math",
+            "@sexpr\n(def value 123)\n",
+        )
+        path = self.write_program(
+            "stdlib_alias.lang",
+            """@sexpr
+(def a (import "std.python.os"))
+(def b (import "python.math"))
+(println (str (len (a.getenv "HOME"))))
+(println (str b.value))
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = normalize(proc.stdout).splitlines()
+        self.assertTrue(out[0].isdigit())
+        self.assertEqual(out[1], "123")
+
+    def test_web_handle_routing(self):
+        path = self.write_program(
+            "web_handle.lang",
+            """@sexpr
+(def web (import "flask"))
+(def app (web.app "demo"))
+(web.get app "/" (fn (req) (web.text "hello")))
+(web.get app "/user/<name>" (fn (req) (web.text (concat "user=" (web.param req "name")))))
+(web.get app "/n/<int:n>" (fn (req) (web.json (list (list "n" (+ (web.param req "n") 1))))))
+(web.get app "/q" (fn (req) (web.text (concat "q=" (web.query req "q" "none")))))
+(web.post app "/echo" (fn (req) (web.json (web.json_body req))))
+(def r1 (web.handle app "GET" "/"))
+(println (concat "r1=" (web.response_text r1)))
+(def r2 (web.handle app "GET" "/user/alice"))
+(println (concat "r2=" (web.response_text r2)))
+(def r3 (web.handle app "GET" "/n/41"))
+(println (concat "r3=" (web.response_text r3)))
+(def r4 (web.handle app "GET" "/q?q=abc"))
+(println (concat "r4=" (web.response_text r4)))
+(def r5 (web.handle app "POST" "/echo" "{\\\"x\\\": 2}"))
+(println (concat "r5=" (web.response_text r5)))
+(def r6 (web.handle app "GET" "/missing"))
+(println (concat "r6=" (str (web.response_status r6))))
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = normalize(proc.stdout)
+        self.assertIn("r1=hello", out)
+        self.assertIn("r2=user=alice", out)
+        self.assertIn('r3=[["n", 42]]', out)
+        self.assertIn("r4=q=abc", out)
+        self.assertIn('r5={"x": 2}', out)
+        self.assertIn("r6=404", out)
+
+    def test_web_templates_static_hooks_and_session(self):
+        template = self.write_program(
+            "templates/index.html",
+            "<h1>{{ title }}</h1>"
+            "<ul>{% for item in items %}<li>{{ item }}</li>{% endfor %}</ul>"
+            "{% if show %}<p>shown</p>{% else %}<p>hidden</p>{% endif %}"
+            "<p>{{ raw|safe }}</p><p>{{ title|upper }}</p>"
+            "<p>{{ missing|default:\"fallback\" }}</p>",
+        )
+        static = self.write_program("static/a.txt", "static-content\n")
+        template_dir = os.path.dirname(template)
+        static_dir = os.path.dirname(static)
+        path = self.write_program(
+            "web_full.lang",
+            """@sexpr
+(def web (import "flask"))
+(def ffi (import "ffi"))
+(def builtins (ffi.python "builtins"))
+(def app (web.app "demo" %s %s))
+(web.cors app "*")
+(web.get app "/" (fn (req) (web.render_kv app "index.html" "title" "Hello" "items" (list "a" "b") "show" true "raw" "<b>x</b>")))
+(web.static app "/static" %s)
+(def api (web.group app "/api"))
+(web.get api "/ping" (fn (req) (web.text "pong")))
+(web.before app (fn (req) ()))
+(web.after app (fn (req resp) (web.header resp "X-Test" "yes")))
+(web.error app 404 (fn (req) (web.text "custom-404" 404)))
+(web.get app "/set" (fn (req)
+  (def r (web.text "set"))
+  (web.session_set req r "who" "alice")))
+(web.get app "/get" (fn (req) (web.text (concat "who=" (web.session_get req "who" "none")))))
+(def r1 (web.handle app "GET" "/"))
+(println (concat "r1=" (web.response_text r1)))
+(def r2 (web.handle app "GET" "/static/a.txt"))
+(println (concat "r2=" (web.response_text r2)))
+(def r3 (web.handle app "GET" "/nope"))
+(println (concat "r3=" (str (web.response_status r3)) " " (web.response_text r3)))
+(def r4 (web.handle app "GET" "/api/ping"))
+(println (concat "r4=" (web.response_text r4)))
+(def r5 (web.handle app "GET" "/set"))
+(def cookie (first (split (first (web.response_cookies r5)) ";")))
+(def headers (builtins.dict (list (list "Cookie" cookie))))
+(def r6 (web.handle_headers app "GET" "/get" "" headers))
+(println (concat "r6=" (web.response_text r6)))
+""" % (json.dumps(template_dir), json.dumps(static_dir), json.dumps(static_dir)),
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = normalize(proc.stdout)
+        self.assertIn("<h1>Hello</h1>", out)
+        self.assertIn("<li>a</li><li>b</li>", out)
+        self.assertIn("<p>shown</p>", out)
+        self.assertIn("<p><b>x</b></p>", out)
+        self.assertIn("<p>HELLO</p>", out)
+        self.assertIn("<p>fallback</p>", out)
+        self.assertIn("r2=static-content", out)
+        self.assertIn("r3=404 custom-404", out)
+        self.assertIn("r4=pong", out)
+        self.assertIn("r6=who=alice", out)
+
+    def test_web_real_http_server(self):
+        path = self.write_program(
+            "web_server.lang",
+            """@sexpr
+(def ffi (import "ffi"))
+(def web (import "flask"))
+(def app (web.app "demo"))
+(web.get app "/" (fn (req) (web.text "hello-http")))
+(def server (web.start app "127.0.0.1" 0))
+(def urllib (ffi.python "urllib.request"))
+(def resp (urllib.urlopen (web.url server)))
+(println (str (resp.read)))
+(web.stop server)
+""",
+        )
+        proc = run_slang("run", path)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("hello-http", proc.stdout)
+
+
 class TestSlangFormat(_TmpDirMixin, unittest.TestCase):
     def _program(self, text, name="main.slang"):
         return self.write_program(name, text)
@@ -1758,8 +1950,8 @@ class TestSlangFormat(_TmpDirMixin, unittest.TestCase):
         self.assertEqual(normalize(proc.stdout), "inline\n15\n8\n")
 
     def test_slang_build_file(self):
-        base = os.path.join(ROOT, "builds", "base.lang.build")
-        std = os.path.join(ROOT, "builds", "std.lang.build")
+        base = os.path.join(ROOT, "slang", "stdlib", "core", "base.lang.build")
+        std = os.path.join(ROOT, "slang", "stdlib", "core", "std.lang.build")
         cfg = self.write_program(
             "slangproj/slang.toml",
             "[builds]\nfiles = [%r, %r, \"extra.slang\"]\n"

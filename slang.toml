@@ -10,6 +10,6 @@ main = "examples/hello.lang"
 
 [builds]
 files = [
-  "builds/base.lang.build",
-  "builds/std.lang.build",
+  "slang/stdlib/core/base.lang.build",
+  "slang/stdlib/core/std.lang.build",
 ]

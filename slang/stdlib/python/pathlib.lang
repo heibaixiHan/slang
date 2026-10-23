@@ -1,0 +1,39 @@
+@sexpr
+; Python pathlib / os.path / glob 的常用封装。
+; 用法：(def p (import "python.pathlib")) 然后 (p.read_text "README.md")
+(def _ffi (import "ffi"))
+(def _os (_ffi.python "os"))
+(def _glob (_ffi.python "glob"))
+(def _helper (_ffi.import "pathlib_helper.ffi.toml"))
+
+(def sep _os.sep)
+(def cwd _os.getcwd)
+(def exists _os.path.exists)
+(def isfile _os.path.isfile)
+(def isdir _os.path.isdir)
+(def isabs _os.path.isabs)
+(def basename _os.path.basename)
+(def dirname _os.path.dirname)
+(def abspath _os.path.abspath)
+(def normpath _os.path.normpath)
+(def relpath _os.path.relpath)
+(def splitext _os.path.splitext)
+(def getsize _os.path.getsize)
+(def getmtime _os.path.getmtime)
+(def listdir _os.listdir)
+(def glob _glob.glob)
+(def mkdir _os.mkdir)
+(def makedirs _os.makedirs)
+(def remove _os.remove)
+(def rename _os.rename)
+
+(defn join (parts...)
+  (if (= (len parts) 0)
+      ""
+      (if (= (len parts) 1)
+          (first parts)
+          (_os.path.join (first parts) (apply join (rest parts))))))
+
+; 文件读写按进程当前工作目录解析，语义与 Python pathlib 一致。
+(defn read_text (path) (_helper.read_text path))
+(defn write_text (path text) (_helper.write_text path text))
