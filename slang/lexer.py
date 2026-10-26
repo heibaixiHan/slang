@@ -82,13 +82,26 @@ def lex(source, mode="sexpr", filename=None):
                     e = source[j + 1]
                     if e == "\n":
                         raise LexError("字符串不能跨行（不支持反斜杠续行）", filename, line, col)
-                    if e in ESCAPES:
+                    if e in ("x", "u"):
+                        width = 2 if e == "x" else 4
+                        digits = source[j + 2:j + 2 + width]
+                        if len(digits) != width or any(
+                                c not in "0123456789abcdefABCDEF" for c in digits):
+                            if e == "x":
+                                raise LexError("\\x 转义需要两位十六进制数",
+                                               filename, line, j - line_start + 1)
+                            raise LexError("\\u 转义需要四位十六进制数",
+                                           filename, line, j - line_start + 1)
+                        buf.append(chr(int(digits, 16)))
+                        j += 2 + width
+                    elif e in ESCAPES:
                         buf.append(ESCAPES[e])
+                        j += 2
                     else:
                         # 未知转义保留反斜杠，避免静默吞掉字符
                         buf.append("\\")
                         buf.append(e)
-                    j += 2
+                        j += 2
                 elif source[j] == "\n":
                     raise LexError("字符串不能跨行（请用 \\n 转义）", filename, line, col)
                 else:

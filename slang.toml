@@ -5,7 +5,7 @@
 
 [project]
 name = "slang语言"
-version = "0.6.0"
+version = "0.6.1"
 main = "examples/hello.lang"
 
 [builds]

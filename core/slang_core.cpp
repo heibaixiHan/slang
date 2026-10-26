@@ -139,8 +139,27 @@ size_t match_number(const std::string& s, size_t i, bool allow_sign) {
     return j - i;
 }
 
-std::string unescape(const std::string& raw) {
-    std::string out;
+void append_utf8(unsigned int cp, std::string& out) {
+    if (cp <= 0x7F) {
+        out += static_cast<char>(cp);
+    } else if (cp <= 0x7FF) {
+        out += static_cast<char>(0xC0 | (cp >> 6));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    } else {
+        out += static_cast<char>(0xE0 | (cp >> 12));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+}
+
+int hex_value(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+bool unescape(const std::string& raw, std::string& out, std::string& err) {
     for (size_t i = 0; i < raw.size(); ++i) {
         if (raw[i] == '\\' && i + 1 < raw.size()) {
             char e = raw[++i];
@@ -151,13 +170,35 @@ std::string unescape(const std::string& raw) {
                 case '\\': out += '\\'; break;
                 case '"': out += '"'; break;
                 case '0': out += '\0'; break;
+                case 'x':
+                case 'u': {
+                    size_t width = e == 'x' ? 2 : 4;
+                    if (i + width >= raw.size()) {
+                        err = e == 'x' ? "\\x 转义需要两位十六进制数"
+                                       : "\\u 转义需要四位十六进制数";
+                        return false;
+                    }
+                    unsigned int cp = 0;
+                    for (size_t k = 1; k <= width; ++k) {
+                        int hv = hex_value(raw[i + k]);
+                        if (hv < 0) {
+                            err = e == 'x' ? "\\x 转义需要两位十六进制数"
+                                           : "\\u 转义需要四位十六进制数";
+                            return false;
+                        }
+                        cp = (cp << 4) | static_cast<unsigned int>(hv);
+                    }
+                    append_utf8(cp, out);
+                    i += width;
+                    break;
+                }
                 default: out += '\\'; out += e;
             }
         } else {
             out += raw[i];
         }
     }
-    return out;
+    return true;
 }
 
 // 与 Python read_source/lexer 一致：CRLF 和裸 CR 都归一化为 LF。
@@ -285,7 +326,12 @@ struct Lexer {
                     }
                 }
                 if (j >= n) return fail("字符串未闭合", line, c);
-                emit("STR", unescape(raw), line, c, col(j + 1, line_start), true);
+                std::string decoded;
+                std::string escape_err;
+                if (!unescape(raw, decoded, escape_err)) {
+                    return fail(escape_err, line, c);
+                }
+                emit("STR", decoded, line, c, col(j + 1, line_start), true);
                 i = j + 1;
                 continue;
             }
@@ -330,7 +376,7 @@ struct Lexer {
 
 extern "C" {
 
-const char* slang_version(void) { return "0.5.0-cpp"; }
+const char* slang_version(void) { return "0.6.1-cpp"; }
 
 // ABI 版本：签名或语义不兼容时递增，Python 侧会拒绝加载不匹配的库。
 int slang_abi_version(void) { return 2; }

@@ -1,6 +1,6 @@
 # slang 语言
 
-一个为「适配不同编程项目」而设计的极简编程语言（v0.6.0）。
+一个为「适配不同编程项目」而设计的极简编程语言（v0.6.1）。
 
 - **双前端**：`.lang` 是严格 S 表达式；`.slang` 是缩进 + 中缀 + f-string 的人类友好格式。两者生成同一棵 AST，`slang decode` 可把 `.slang` 导出为等价的 `.lang`（规范见 `docs/slang-format.md`）。
 - **底层**：Python 负责解析/求值/加载等复杂且易变的部分；C++ 负责稳定、性能敏感的词法分析（编译一次，长期使用）。
@@ -67,7 +67,7 @@ python3 -m slang --project /path/to/slang.toml run /path/to/program.lang
 ```toml
 [project]
 name = "slang语言"
-version = "0.6.0"
+version = "0.6.1"
 main = "examples/hello.lang"
 
 [builds]
@@ -765,7 +765,7 @@ slang语言/
 │   ├── slang_demo.slang    # .slang 综合示例
 │   ├── slang_math.slang    # 供示例导入的 .slang 模块
 │   └── ffi/                # ffi 配置文件示例（json.ffi.toml / libc.ffi.toml）
-├── tests/test_slang.py     # 端到端测试（139 个）
+├── tests/test_slang.py     # 端到端测试（140 个）
 └── bin/slang               # 命令行包装器（自动解析符号链接）
 ```
 
@@ -797,7 +797,7 @@ make test
 make test-python
 ```
 
-139 个端到端测试覆盖：示例输出、条件/布尔语义（裸变量、`true/false/nil`、遮蔽）、嵌套宏与宏参数名冲突、`and/or/when` 短路返回值、`set` 与闭包状态、宏环境、多表达式函数体、字符串名称、转义与续行、`sort/split/join/substr`、覆盖隔离、十万级列表、auto 模式（`1 +2`/`1 -2`/`1 %2`、空参数、顶层逗号）、重复参数名与变长参数位置、空函数体、定义名含 `.`、大整数与位数上限、NUL 路径、模块相对加载、函数内 load/load-config、import 缓存、错误定位与调用链、循环加载、模块隔离（主程序全局不可见、`a.b.c` 嵌套、成员不泄漏）、BOM/shebang、裸 CR 归一化、同行声明报错、项目发现、相对路径严格按源文件目录解析、`check --project` 只解析不执行、警告去重、readfile 相对路径、`log` 模块（显式 import / 不自动加载 / 事件内容 / 追加模式）、`ffi` 模块（显式 import / 不自动加载 / Python 直接导入与配置导入 / 重命名与导出 / 本地 .py / Python 异常定位 / Python 回调 / C 直接导入 / C 签名与结构体 / 变参 printf / malloc+指针读取 / 运行时 ffi.bind / 两参数覆盖配置 / 句柄关闭 / 默认配置合法性 / 错误配置）、`.slang` 格式（综合语法、`@slang` 头、显式 `@sexpr` 覆盖扩展名、`.lang`/`.slang` 混合加载与导入、`.slang` 构建文件、模块 import/from、宏、控制流、运算符优先级、字符串/插值、f-string 空白与花括号、`\x`/`\u` 转义、原始字符串反斜杠、数字与续行、赋值/变长参数、嵌套函数/行内块、块 lambda、相对 load、decode 往返、非有限浮点 decode、check/lex、Unicode/CRLF、空文件、缩进与语法错误）、TOML 兜底解析、内置构建与项目构建一致性、标准库 Python/C 包装、Flask 风格 Web、`.slang.module.inline` 缓存/内联/失效回退、`logger` 级别过滤，以及 C++/Python 两套词法器的逐 token 一致性（含 600 条固定种子的随机差分语料）。
+140 个端到端测试覆盖：示例输出、条件/布尔语义（裸变量、`true/false/nil`、遮蔽）、嵌套宏与宏参数名冲突、`and/or/when` 短路返回值、`set` 与闭包状态、宏环境、多表达式函数体、字符串名称、`.lang` 的 `\x`/`\u` 转义、转义与续行、`sort/split/join/substr`、覆盖隔离、十万级列表、auto 模式（`1 +2`/`1 -2`/`1 %2`、空参数、顶层逗号）、重复参数名与变长参数位置、空函数体、定义名含 `.`、大整数与位数上限、NUL 路径、模块相对加载、函数内 load/load-config、import 缓存、错误定位与调用链、循环加载、模块隔离（主程序全局不可见、`a.b.c` 嵌套、成员不泄漏）、BOM/shebang、裸 CR 归一化、同行声明报错、项目发现、相对路径严格按源文件目录解析、`check --project` 只解析不执行、警告去重、readfile 相对路径、`log` 模块（显式 import / 不自动加载 / 事件内容 / 追加模式）、`ffi` 模块（显式 import / 不自动加载 / Python 直接导入与配置导入 / 重命名与导出 / 本地 .py / Python 异常定位 / Python 回调 / C 直接导入 / C 签名与结构体 / 变参 printf / malloc+指针读取 / 运行时 ffi.bind / 两参数覆盖配置 / 句柄关闭 / 默认配置合法性 / 错误配置）、`.slang` 格式（综合语法、`@slang` 头、显式 `@sexpr` 覆盖扩展名、`.lang`/`.slang` 混合加载与导入、`.slang` 构建文件、模块 import/from、宏、控制流、运算符优先级、字符串/插值、f-string 空白与花括号、`\x`/`\u` 转义、原始字符串反斜杠、数字与续行、赋值/变长参数、嵌套函数/行内块、块 lambda、相对 load、decode 往返、非有限浮点 decode、check/lex、Unicode/CRLF、空文件、缩进与语法错误）、TOML 兜底解析、内置构建与项目构建一致性、标准库 Python/C 包装、Flask 风格 Web、`.slang.module.inline` 缓存/内联/失效回退、`logger` 级别过滤，以及 C++/Python 两套词法器的逐 token 一致性（含 600 条固定种子的随机差分语料）。
 
 ---
 
@@ -807,7 +807,7 @@ make test-python
 - [ ] 深递归仍受 Python 栈限制（CLI 已把上限调到 20000，解释器内部另有 2000 层调用深度保护并给出可读错误）；`range/map/filter/reduce/take/drop` 已是迭代实现、可处理十万级列表，但用户手写的 `cons` 递归仍是 O(n²) 且受栈深限制。
 - [ ] 无导出列表/选择性导入；模块缓存没有显式 reload 语法（需新进程）。模块看不到主程序全局变量，需要共享时必须显式 `import`。
 - [ ] TOML 兜底解析已支持行内注释、点号键、数字下划线/十六进制与重复键检测，但仍不支持多行字符串、行内表等高级语法；优先用 `tomllib`/`tomli`。
-- [ ] 字符串：`.lang` 支持 `\n \t \r \\ \" \0`；未知转义（`\q`）会**保留反斜杠**而不是静默丢弃；`\u`/`\x` 只在 `.slang` 前端支持，`.lang` 尚未实现，`\`+换行会报错。
+- [ ] 字符串：`.lang` 支持 `\n \t \r \\ \" \0` 以及 `\xHH`、`\uHHHH`（`\u` 固定四位）；未知转义（`\q`）会**保留反斜杠**而不是静默丢弃；`\`+换行会报错。
 - [ ] `.slang` 是语法糖，不引入新的运行时能力：没有 `return` / `while` / `for` / `break` / `continue`、字典字面量、切片、索引赋值、关键字参数、参数默认值、解构赋值或链式比较；函数体最后一个表达式的值就是返回值。详见 `docs/slang-format.md`。
 - [ ] `check` 只解析不执行；`--project` 会校验配置与构建文件（同样不执行）；`lex` 仅用于调试，输出严格 JSON（非有限浮点写成 `"Infinity"`/`"NaN"` 字符串）。
 - [ ] 求值器未迁入 C++；没有尾调用优化，也没有 `while`。

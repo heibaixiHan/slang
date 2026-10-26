@@ -359,6 +359,8 @@ class TestSemantics(_TmpDirMixin, unittest.TestCase):
         program = r'''@sexpr
 (println "a\qb")
 (println "a\u0041b")
+(println "a\x41b")
+(println "a\u4e2db")
 (println "tab:\there")
 (println "quote:\"ok\"")
 (println "slash:\\ok")
@@ -369,13 +371,33 @@ class TestSemantics(_TmpDirMixin, unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         expected = (
             "a\\qb\n"
-            "a\\u0041b\n"
+            "aAb\n"
+            "aAb\n"
+            "a中b\n"
             "tab:\there\n"
             "quote:\"ok\"\n"
             "slash:\\ok\n"
             "nul:\x00end\n"
         )
         self.assertEqual(proc.stdout, expected)
+
+    def test_invalid_hex_unicode_escape(self):
+        path = self.write_program(
+            "escape_bad.lang",
+            '@sexpr\n(println "a\\x4")\n(println "a\\u12")\n',
+        )
+        for args in (("run", path), ("--no-native", "run", path)):
+            with self.subTest(args=args):
+                proc = run_slang(*args)
+                self.assertEqual(proc.returncode, 1)
+                self.assertIn("\\x 转义需要两位十六进制数", proc.stderr)
+
+        path = self.write_program("escape_bad_u.lang", '@sexpr\n(println "a\\u12")\n')
+        for args in (("run", path), ("--no-native", "run", path)):
+            with self.subTest(args=args):
+                proc = run_slang(*args)
+                self.assertEqual(proc.returncode, 1)
+                self.assertIn("\\u 转义需要四位十六进制数", proc.stderr)
 
     def test_backslash_newline_rejected(self):
         path = self.write_program("cont.lang", '@sexpr\n(println "a\\\nb")\n')
@@ -1029,7 +1051,7 @@ class TestLexerBackends(_TmpDirMixin, unittest.TestCase):
             "edge_comma.lang": "@sexpr\n(println 1 , 2)\n",
             "edge_zeros.lang": "@sexpr\n(println 00)\n(println 007)\n(println -00.5)\n(println 00e2)\n",
             "edge_unicode.lang": "@sexpr\n(println ١٢٣)\n",
-            "edge_escapes.lang": '@sexpr\n(println "a\\qb")\n(println "a\\u0041b")\n(println "nul:\\0end")\n',
+            "edge_escapes.lang": '@sexpr\n(println "a\\qb")\n(println "a\\u0041b")\n(println "a\\x41b")\n(println "a\\u4e2db")\n(println "nul:\\0end")\n',
         }
         for name, text in cases.items():
             with self.subTest(file=name):
@@ -1164,9 +1186,9 @@ class TestPackaging(unittest.TestCase):
     def test_version_reports_both_backends(self):
         proc = run_slang("version")
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("0.6.0", proc.stdout)
+        self.assertIn("0.6.1", proc.stdout)
         if cpp_available():
-            self.assertIn("0.5.0-cpp", proc.stdout)
+            self.assertIn("0.6.1-cpp", proc.stdout)
         proc = run_slang("version", "--no-native")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("已禁用", proc.stdout)
